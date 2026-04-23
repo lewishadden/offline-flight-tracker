@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.WbCloudy
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -78,6 +79,7 @@ fun FlightDetailScreen(
     onPreDownload: (String) -> Unit,
     onOpenMap: (String) -> Unit,
     onOpenAirport: (String) -> Unit,
+    onOpenRouteWeather: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -122,6 +124,12 @@ fun FlightDetailScreen(
                                                      else "Subscribe to updates",
                                 tint = if (subscribed) MaterialTheme.colorScheme.tertiary
                                        else MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                        IconButton(onClick = { onOpenRouteWeather(vm.faFlightId) }) {
+                            Icon(
+                                Icons.Default.WbCloudy,
+                                contentDescription = "Route weather",
                             )
                         }
                         IconButton(onClick = vm::refresh) {

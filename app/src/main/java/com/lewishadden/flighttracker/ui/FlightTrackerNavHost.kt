@@ -12,6 +12,7 @@ import com.lewishadden.flighttracker.ui.detail.FlightDetailScreen
 import com.lewishadden.flighttracker.ui.flightmap.FlightMapScreen
 import com.lewishadden.flighttracker.ui.main.MainTabsScaffold
 import com.lewishadden.flighttracker.ui.predownload.PreDownloadScreen
+import com.lewishadden.flighttracker.ui.weather.RouteWeatherScreen
 
 object Routes {
     const val HOME = "home"
@@ -19,10 +20,12 @@ object Routes {
     const val PREDOWNLOAD = "predownload/{faFlightId}"
     const val MAP = "map/{faFlightId}"
     const val AIRPORT = "airport/{code}"
+    const val ROUTE_WEATHER = "weather/{faFlightId}"
     fun detail(faFlightId: String) = "detail/$faFlightId"
     fun predownload(faFlightId: String) = "predownload/$faFlightId"
     fun map(faFlightId: String) = "map/$faFlightId"
     fun airport(code: String) = "airport/$code"
+    fun routeWeather(faFlightId: String) = "weather/$faFlightId"
 }
 
 @Composable
@@ -44,6 +47,16 @@ fun FlightTrackerNavHost() {
                 onPreDownload = { id -> nav.navigate(Routes.predownload(id)) },
                 onOpenMap = { id -> nav.navigate(Routes.map(id)) },
                 onOpenAirport = { code -> nav.navigate(Routes.airport(code)) },
+                onOpenRouteWeather = { id -> nav.navigate(Routes.routeWeather(id)) },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(
+            Routes.ROUTE_WEATHER,
+            arguments = listOf(navArgument("faFlightId") { type = NavType.StringType }),
+        ) {
+            RouteWeatherScreen(
+                vm = hiltViewModel(),
                 onBack = { nav.popBackStack() },
             )
         }

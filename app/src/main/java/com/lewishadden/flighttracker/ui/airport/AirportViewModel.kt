@@ -41,34 +41,38 @@ class AirportViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             _ui.value = _ui.value.copy(loading = true, error = null)
-            // All four fetches are independent — fan out concurrently so the
-            // screen comes up at the speed of the slowest call rather than the
-            // sum of all of them.
-            val results = listOf(
-                async { repo.getInfo(airportCode) },
-                async { repo.getWeather(airportCode) },
-                async { repo.getScheduledDepartures(airportCode) },
-                async { repo.getScheduledArrivals(airportCode) },
-            ).awaitAll()
+
+            // Info needs to complete first so we have ICAO + lat/lon for the
+            // weather lookup. Departures and arrivals can fan out alongside.
+            val infoDeferred = async { repo.getInfo(airportCode) }
+            val depsDeferred = async { repo.getScheduledDepartures(airportCode) }
+            val arrsDeferred = async { repo.getScheduledArrivals(airportCode) }
+
+            val info = infoDeferred.await()
+            val weatherDeferred = async {
+                repo.getWeather(
+                    icaoCode = info?.codeIcao ?: airportCode.takeIf { it.length == 4 },
+                    lat = info?.lat,
+                    lon = info?.lon,
+                )
+            }
+
+            val (departures, arrivals, weather) = listOf(
+                depsDeferred,
+                arrsDeferred,
+                weatherDeferred,
+            ).awaitAll().let { Triple(it[0], it[1], it[2]) }
 
             @Suppress("UNCHECKED_CAST")
-            val info = results[0] as AirportSummary?
-            @Suppress("UNCHECKED_CAST")
-            val weather = results[1] as AirportWeather?
-            @Suppress("UNCHECKED_CAST")
-            val departures = results[2] as List<Flight>
-            @Suppress("UNCHECKED_CAST")
-            val arrivals = results[3] as List<Flight>
-
             _ui.value = AirportUiState(
                 loading = false,
                 info = info,
-                weather = weather,
-                departures = departures,
-                arrivals = arrivals,
-                error = if (info == null && weather == null && departures.isEmpty() && arrivals.isEmpty()) {
-                    "Couldn't load airport data. Check your connection and try again."
-                } else null,
+                weather = weather as AirportWeather?,
+                departures = departures as List<Flight>,
+                arrivals = arrivals as List<Flight>,
+                error = if (info == null && weather == null &&
+                    (departures as List<*>).isEmpty() && (arrivals as List<*>).isEmpty()
+                ) "Couldn't load airport data. Check your connection and try again." else null,
             )
         }
     }

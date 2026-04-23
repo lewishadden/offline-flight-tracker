@@ -3,6 +3,8 @@ package com.lewishadden.flighttracker.di
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.lewishadden.flighttracker.BuildConfig
 import com.lewishadden.flighttracker.data.api.AeroApiService
+import com.lewishadden.flighttracker.data.api.AviationWeatherApi
+import com.lewishadden.flighttracker.data.api.OpenMeteoApi
 import com.lewishadden.flighttracker.data.api.PlanespottersApi
 import dagger.Module
 import dagger.Provides
@@ -19,6 +21,8 @@ import javax.inject.Singleton
 
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class AeroRetrofit
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class PlanespottersRetrofit
+@Qualifier @Retention(AnnotationRetention.BINARY) annotation class AviationWeatherRetrofit
+@Qualifier @Retention(AnnotationRetention.BINARY) annotation class OpenMeteoRetrofit
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class AeroOkHttp
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class PlainOkHttp
 
@@ -102,4 +106,34 @@ object NetworkModule {
     @Singleton
     fun planespottersApi(@PlanespottersRetrofit retrofit: Retrofit): PlanespottersApi =
         retrofit.create(PlanespottersApi::class.java)
+
+    @Provides
+    @Singleton
+    @AviationWeatherRetrofit
+    fun aviationWeatherRetrofit(@PlainOkHttp client: OkHttpClient, json: Json): Retrofit =
+        Retrofit.Builder()
+            .baseUrl("https://aviationweather.gov/api/")
+            .client(client)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+
+    @Provides
+    @Singleton
+    fun aviationWeatherApi(@AviationWeatherRetrofit retrofit: Retrofit): AviationWeatherApi =
+        retrofit.create(AviationWeatherApi::class.java)
+
+    @Provides
+    @Singleton
+    @OpenMeteoRetrofit
+    fun openMeteoRetrofit(@PlainOkHttp client: OkHttpClient, json: Json): Retrofit =
+        Retrofit.Builder()
+            .baseUrl("https://api.open-meteo.com/v1/")
+            .client(client)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+
+    @Provides
+    @Singleton
+    fun openMeteoApi(@OpenMeteoRetrofit retrofit: Retrofit): OpenMeteoApi =
+        retrofit.create(OpenMeteoApi::class.java)
 }

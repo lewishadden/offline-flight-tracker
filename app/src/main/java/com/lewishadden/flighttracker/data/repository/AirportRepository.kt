@@ -5,13 +5,13 @@ import com.lewishadden.flighttracker.data.toDomain
 import com.lewishadden.flighttracker.domain.model.AirportSummary
 import com.lewishadden.flighttracker.domain.model.AirportWeather
 import com.lewishadden.flighttracker.domain.model.Flight
-import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class AirportRepository @Inject constructor(
     private val api: AeroApiService,
+    private val weather: WeatherRepository,
 ) {
 
     /**
@@ -35,24 +35,20 @@ class AirportRepository @Inject constructor(
         )
     }
 
-    /** Most recent METAR weather report for the airport, or null if unavailable. */
-    suspend fun getWeather(code: String): AirportWeather? {
-        val resp = runCatching { api.getMetar(code) }.getOrNull() ?: return null
-        // AeroAPI returns the METAR fields at top level (not wrapped in
-        // `reports`). The DTO accepts both shapes; firstReport() picks one.
-        val first = resp.firstReport() ?: return null
-        return AirportWeather(
-            raw = first.rawData,
-            time = first.time?.let { runCatching { Instant.parse(it) }.getOrNull() },
-            temperatureC = first.effectiveTemperature,
-            pressure = first.pressure,
-            pressureUnits = first.pressureUnits,
-            wind = first.windFriendly,
-            visibility = first.visibilityFriendly,
-            conditions = first.conditions,
-            clouds = first.effectiveCloudsFriendly,
-        )
-    }
+    /**
+     * Most recent weather for the airport. Tries NOAA METAR first (proper
+     * aviation data — free, no key) using the ICAO code; falls back to
+     * Open-Meteo's lat/lon-based current conditions when METAR isn't
+     * available (some smaller airports or non-ICAO inputs).
+     *
+     * Pass lat/lon when known (e.g. from a prior [getInfo] call) to enable
+     * the fallback path.
+     */
+    suspend fun getWeather(
+        icaoCode: String?,
+        lat: Double? = null,
+        lon: Double? = null,
+    ): AirportWeather? = weather.getAirportWeather(icaoCode, lat, lon)
 
     suspend fun getScheduledDepartures(code: String): List<Flight> {
         val resp = runCatching { api.getScheduledDepartures(code) }.getOrNull() ?: return emptyList()
