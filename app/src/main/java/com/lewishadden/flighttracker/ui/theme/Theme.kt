@@ -15,6 +15,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import com.lewishadden.flighttracker.data.prefs.ThemeMode
 
 private val BrandDarkColors = darkColorScheme(
     primary = Brand.Sky,
@@ -46,11 +47,34 @@ private val BrandDarkColors = darkColorScheme(
     outlineVariant = Color(0xFF1F2849),
 )
 
-@Suppress("unused")
 private val BrandLightColors = lightColorScheme(
     primary = Brand.SkyDeep,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFD3E9FF),
+    onPrimaryContainer = Brand.IndigoDeep,
     secondary = Color(0xFF0277BD),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFCDEBF6),
+    onSecondaryContainer = Brand.IndigoDeep,
     tertiary = Brand.Amber2,
+    onTertiary = Brand.IndigoDeep,
+    tertiaryContainer = Color(0xFFFFE3C4),
+    onTertiaryContainer = Color(0xFF3A2A12),
+    error = Color(0xFFC62828),
+    onError = Color.White,
+    background = Brand.LightBackground,
+    onBackground = Brand.LightOnSurface,
+    surface = Brand.LightSurface,
+    onSurface = Brand.LightOnSurface,
+    surfaceVariant = Brand.LightSurfaceHi,
+    onSurfaceVariant = Brand.LightOnSurfaceDim,
+    surfaceContainer = Brand.LightSurfaceHi,
+    surfaceContainerHigh = Brand.LightSurfaceLo,
+    surfaceContainerHighest = Color(0xFFD7DFEF),
+    surfaceContainerLow = Color(0xFFF0F4FB),
+    surfaceContainerLowest = Color.White,
+    outline = Brand.LightOutline,
+    outlineVariant = Color(0xFFDEE5F2),
 )
 
 private val BrandTypography = Typography(
@@ -67,23 +91,27 @@ private val BrandTypography = Typography(
 
 @Composable
 fun FlightTrackerTheme(
-    @Suppress("UNUSED_PARAMETER") darkTheme: Boolean = isSystemInDarkTheme(),
-    @Suppress("UNUSED_PARAMETER") dynamicColor: Boolean = false,
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit,
 ) {
-    // Fixed brand theme — ignores system dynamic color to preserve identity.
-    val colors = BrandDarkColors
+    val systemDark = isSystemInDarkTheme()
+    val useDark = when (themeMode) {
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+        ThemeMode.SYSTEM -> systemDark
+    }
+    val colors = if (useDark) BrandDarkColors else BrandLightColors
 
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as? Activity)?.window
             if (window != null) {
-                window.statusBarColor = Brand.IndigoDeep.toArgb()
-                window.navigationBarColor = Brand.IndigoDeep.toArgb()
+                window.statusBarColor = colors.background.toArgb()
+                window.navigationBarColor = colors.background.toArgb()
                 val controller = WindowCompat.getInsetsController(window, view)
-                controller.isAppearanceLightStatusBars = false
-                controller.isAppearanceLightNavigationBars = false
+                controller.isAppearanceLightStatusBars = !useDark
+                controller.isAppearanceLightNavigationBars = !useDark
             }
         }
     }

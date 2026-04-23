@@ -1,0 +1,48 @@
+<!--
+    Premium midnight-aviation adaptive icon background.
+    Linear indigo gradient + soft sky highlight in the upper-right gives a
+    sense of depth and atmosphere without being busy at small icon sizes.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Base diagonal gradient: IndigoDeep → Indigo → IndigoHi -->
+    <path android:pathData="M0,0 L108,0 L108,108 L0,108 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0" android:startY="0"
+                android:endX="108" android:endY="108"
+                android:startColor="#FF0B1328"
+                android:endColor="#FF1B2447" />
+        </aapt:attr>
+    </path>
+
+    <!-- Soft sky-blue highlight in the upper-right for studio lighting -->
+    <path android:pathData="M0,0 L108,0 L108,108 L0,108 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="86" android:centerY="22"
+                android:gradientRadius="80"
+                android:startColor="#4055B9F7"
+                android:endColor="#0055B9F7" />
+        </aapt:attr>
+    </path>
+
+    <!-- Subtle vignette in the lower-left to anchor the composition -->
+    <path android:pathData="M0,0 L108,0 L108,108 L0,108 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="20" android:centerY="100"
+                android:gradientRadius="80"
+                android:startColor="#40000000"
+                android:endColor="#00000000" />
+        </aapt:attr>
+    </path>
+</vector>

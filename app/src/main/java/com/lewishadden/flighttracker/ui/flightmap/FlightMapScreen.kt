@@ -41,6 +41,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lewishadden.flighttracker.location.LocationController
 import com.lewishadden.flighttracker.ui.theme.Brand
+// PositionSource lives in the same package as FlightMapUiState (this file imports
+// FlightMapUiState transitively via vm.state).
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,8 +123,9 @@ fun FlightMapScreen(
                     )
                 })
             } else {
+                val units by vm.units.collectAsStateWithLifecycle()
                 MapLibreFlightView(state)
-                InfoOverlay(state)
+                InfoOverlay(state, units)
                 state.flight?.takeIf { it.diverted }?.let { f ->
                     DivertedBanner(
                         destinationName = f.destination.city
@@ -180,10 +183,11 @@ private fun PermissionRequest(onGrant: () -> Unit) {
 }
 
 @Composable
-private fun InfoOverlay(state: FlightMapUiState) {
+private fun InfoOverlay(state: FlightMapUiState, units: com.lewishadden.flighttracker.data.prefs.UnitSystem) {
     val progress = state.progressAlongRouteKm
     val total = state.totalRouteKm
     val pct = if (progress != null && total != null && total > 0) (progress / total).coerceIn(0.0, 1.0) else null
+    val imperial = units == com.lewishadden.flighttracker.data.prefs.UnitSystem.IMPERIAL
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -197,20 +201,29 @@ private fun InfoOverlay(state: FlightMapUiState) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val loc = state.location
+            // Header label tracks the actual data source so the user sees
+            // whether they're looking at the live aircraft fix or their own GPS.
+            val sourceLabel = when (state.positionSource) {
+                PositionSource.AIRCRAFT -> "AIRCRAFT"
+                PositionSource.GPS -> "GPS"
+                PositionSource.NONE -> "GPS"
+            }
             Column {
-                Text("GPS", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                Text(sourceLabel, color = Color.White, style = MaterialTheme.typography.labelSmall)
                 if (loc != null) {
                     Text(
                         "%.4f, %.4f".format(loc.latitude, loc.longitude),
                         color = Color.White,
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                    val altText = if (imperial) "%.0f ft".format(loc.altitude / 0.3048)
+                                  else "%.0f m".format(loc.altitude)
+                    val spdText = if (imperial) "%.0f mph".format(loc.speed * 2.23694f)
+                                  else "%.0f kph".format(loc.speed * 3.6f)
+                    val accText = if (imperial) "±%.0f ft".format(loc.accuracy / 0.3048f)
+                                  else "±%.0f m".format(loc.accuracy)
                     Text(
-                        "alt %.0f m · %.0f kt · ±%.0f m".format(
-                            loc.altitude,
-                            loc.speed * 1.94384f,
-                            loc.accuracy,
-                        ),
+                        "alt $altText · $spdText · $accText",
                         color = Color.White,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -220,8 +233,15 @@ private fun InfoOverlay(state: FlightMapUiState) {
             }
             Column {
                 Text("ROUTE", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                val routeText = if (progress != null && total != null) {
+                    if (imperial) {
+                        "%.0f / %.0f mi".format(progress * 0.621371, total * 0.621371)
+                    } else {
+                        "%.0f / %.0f km".format(progress, total)
+                    }
+                } else "—"
                 Text(
-                    if (progress != null && total != null) "%.0f / %.0f km".format(progress, total) else "—",
+                    routeText,
                     color = Color.White,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
@@ -232,8 +252,10 @@ private fun InfoOverlay(state: FlightMapUiState) {
                     style = MaterialTheme.typography.bodySmall,
                 )
                 state.crossTrackKm?.let {
+                    val offPath = if (imperial) "%.1f mi off path".format(it * 0.621371)
+                                  else "%.1f km off path".format(it)
                     Text(
-                        "%.1f km off path".format(it),
+                        offPath,
                         color = Color.White,
                         style = MaterialTheme.typography.bodySmall,
                     )

@@ -5,6 +5,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lewishadden.flighttracker.data.db.FlightDao
+import com.lewishadden.flighttracker.data.prefs.UnitSystem
+import com.lewishadden.flighttracker.data.prefs.UserPreferences
 import com.lewishadden.flighttracker.data.repository.FlightRepository
 import com.lewishadden.flighttracker.domain.model.Flight
 import com.lewishadden.flighttracker.domain.model.RouteFix
@@ -45,6 +47,7 @@ data class FlightMapUiState(
 class FlightMapViewModel @Inject constructor(
     private val repo: FlightRepository,
     private val networkMonitor: NetworkMonitor,
+    prefs: UserPreferences,
     dao: FlightDao,
     savedState: SavedStateHandle,
 ) : ViewModel() {
@@ -53,6 +56,10 @@ class FlightMapViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(FlightMapUiState())
     val state: StateFlow<FlightMapUiState> = _state.asStateFlow()
+
+    val units: StateFlow<UnitSystem> = prefs.settings
+        .map { it.units }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UnitSystem.IMPERIAL)
 
     val hasOfflineRegion: StateFlow<Boolean> = dao.observeOfflineRegion(faFlightId)
         .map { it != null }
@@ -91,41 +98,55 @@ class FlightMapViewModel @Inject constructor(
     }
 
     /**
-     * Polls AeroAPI's `/flights/{id}/position` endpoint while the flight is
-     * airborne and the device is online. Falls silent (releasing back to GPS)
-     * when offline or pre-departure / post-arrival.
+     * Polls AeroAPI's `/flights/{id}/position` whenever the device is online.
+     *
+     * We don't gate on a local "airborne" guess because AeroAPI's `actualOff`/
+     * `actualOut` fields can lag the real wheels-up event by minutes — so the
+     * VM would refuse to fetch when the aircraft was already in the air. The
+     * API itself is the source of truth: a non-null `last_position` means there
+     * IS a live fix; a null response means there isn't (pre-departure, on the
+     * ground, or out of ADS-B coverage) and we degrade to phone GPS.
      */
     private suspend fun liveAircraftPositionLoop() {
         while (viewModelScope.isActive) {
             val flight = _state.value.flight
             val online = networkMonitor.snapshot().online
-            val airborne = flight != null && isAirborne(flight)
 
-            if (!online || !airborne) {
-                // Step down to GPS if we were on aircraft source.
-                if (_state.value.positionSource == PositionSource.AIRCRAFT) {
-                    _state.value = _state.value.copy(positionSource = PositionSource.GPS)
-                }
+            if (flight == null) {
+                // Flight still loading from DB — try again shortly.
+                delay(POLL_BOOTSTRAP_MS)
+                continue
+            }
+            if (!online) {
+                releaseAircraftLock()
                 delay(POLL_OFF_MS)
                 continue
             }
 
-            runCatching { repo.getLivePosition(faFlightId) }
-                .onSuccess { tp ->
-                    if (tp != null) {
-                        val asLocation = Location("aeroapi").apply {
-                            latitude = tp.lat
-                            longitude = tp.lon
-                            tp.altitudeFt100?.let { altitude = (it * 100).toDouble() * 0.3048 }
-                            tp.groundspeedKts?.let { speed = (it * 0.514444).toFloat() }
-                            tp.headingDeg?.let { bearing = it.toFloat() }
-                            time = tp.timestamp.toEpochMilli()
-                        }
-                        applyPosition(tp.lat, tp.lon, source = PositionSource.AIRCRAFT, raw = asLocation)
-                    }
+            val tp = runCatching { repo.getLivePosition(faFlightId) }.getOrNull()
+            if (tp != null) {
+                val asLocation = Location("aeroapi").apply {
+                    latitude = tp.lat
+                    longitude = tp.lon
+                    tp.altitudeFt100?.let { altitude = (it * 100).toDouble() * 0.3048 }
+                    tp.groundspeedKts?.let { speed = (it * 0.514444).toFloat() }
+                    tp.headingDeg?.let { bearing = it.toFloat() }
+                    time = tp.timestamp.toEpochMilli()
                 }
+                applyPosition(tp.lat, tp.lon, source = PositionSource.AIRCRAFT, raw = asLocation)
+                delay(POLL_LIVE_MS)
+            } else {
+                // No live position — let GPS take back over.
+                releaseAircraftLock()
+                delay(POLL_OFF_MS)
+            }
+        }
+    }
 
-            delay(POLL_LIVE_MS)
+    /** Releases the AIRCRAFT source so the GPS collector is allowed through. */
+    private fun releaseAircraftLock() {
+        if (_state.value.positionSource == PositionSource.AIRCRAFT) {
+            _state.value = _state.value.copy(positionSource = PositionSource.GPS)
         }
     }
 
@@ -192,7 +213,9 @@ class FlightMapViewModel @Inject constructor(
         // Live aircraft position cadence — 30 s in flight is plenty given AeroAPI
         // updates the underlying position every ~minute.
         private const val POLL_LIVE_MS = 30_000L
-        // When not airborne or offline, back off so we're not pinging AeroAPI for nothing.
+        // No live fix or offline — back off so we're not pinging AeroAPI for nothing.
         private const val POLL_OFF_MS = 60_000L
+        // Tight retry while waiting for the flight row to load from the DB on screen mount.
+        private const val POLL_BOOTSTRAP_MS = 500L
     }
 }

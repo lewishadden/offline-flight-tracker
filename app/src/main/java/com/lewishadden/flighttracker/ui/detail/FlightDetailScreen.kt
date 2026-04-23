@@ -53,15 +53,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lewishadden.flighttracker.data.prefs.UnitSystem
 import com.lewishadden.flighttracker.domain.model.Flight
 import com.lewishadden.flighttracker.ui.common.BrandBackground
 import com.lewishadden.flighttracker.ui.common.BrandCard
 import com.lewishadden.flighttracker.ui.common.BrandChip
 import com.lewishadden.flighttracker.ui.common.KvRow
 import com.lewishadden.flighttracker.ui.common.SectionHeader
+import com.lewishadden.flighttracker.ui.common.formatAirspeed
+import com.lewishadden.flighttracker.ui.common.formatAltitude
 import com.lewishadden.flighttracker.ui.common.formatDateOnly
 import com.lewishadden.flighttracker.ui.common.formatDateTime
 import com.lewishadden.flighttracker.ui.common.formatDelay
+import com.lewishadden.flighttracker.ui.common.formatDistance
 import com.lewishadden.flighttracker.ui.common.formatTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,6 +79,7 @@ fun FlightDetailScreen(
     val ui by vm.ui.collectAsStateWithLifecycle()
     val hasOffline by vm.hasOfflineRegion.collectAsStateWithLifecycle()
     val subscribed by vm.subscribed.collectAsStateWithLifecycle()
+    val units by vm.units.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -147,6 +152,7 @@ fun FlightDetailScreen(
                         refreshing = ui.refreshing,
                         hasOffline = hasOffline,
                         subscribed = subscribed,
+                        units = units,
                         photo = ui.photo,
                         onPreDownload = { onPreDownload(vm.faFlightId) },
                         onOpenMap = { onOpenMap(vm.faFlightId) },
@@ -168,6 +174,7 @@ private fun FlightDetailContent(
     refreshing: Boolean,
     hasOffline: Boolean,
     subscribed: Boolean,
+    units: UnitSystem,
     photo: AircraftPhoto?,
     onPreDownload: () -> Unit,
     onOpenMap: () -> Unit,
@@ -187,7 +194,7 @@ private fun FlightDetailContent(
         HeroCard(flight)
         DepartureCard(flight)
         ArrivalCard(flight)
-        AircraftCard(flight)
+        AircraftCard(flight, units)
 
         Spacer(Modifier.height(2.dp))
         // Trip Mode — one tap to subscribe + download offline map. Hidden once
@@ -400,7 +407,7 @@ private fun ArrivalCard(flight: Flight) {
 }
 
 @Composable
-private fun AircraftCard(flight: Flight) {
+private fun AircraftCard(flight: Flight, units: UnitSystem) {
     BrandCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -408,22 +415,9 @@ private fun AircraftCard(flight: Flight) {
         ) {
             SectionHeader("Aircraft & route")
             KvRow("Type", flight.aircraftType ?: "—")
-            KvRow(
-                "Distance",
-                // AeroAPI returns route distance in nautical miles. Convert to
-                // statute miles (the everyday "mile") for display.
-                flight.routeDistanceNm?.let { "%,d mi".format((it * 1.15078).toInt()) } ?: "—",
-            )
-            KvRow(
-                "Filed altitude",
-                // filedAltitudeFt100 is in hundreds of feet (e.g. 350 = FL350 = 35,000 ft).
-                flight.filedAltitudeFt100?.let { "%,d ft".format(it * 100) } ?: "—",
-            )
-            KvRow(
-                "Filed speed",
-                // Filed airspeed is in knots; convert to mph.
-                flight.filedAirspeedKts?.let { "%,d mph".format((it * 1.15078).toInt()) } ?: "—",
-            )
+            KvRow("Distance", formatDistance(flight.routeDistanceNm, units))
+            KvRow("Filed altitude", formatAltitude(flight.filedAltitudeFt100, units))
+            KvRow("Filed speed", formatAirspeed(flight.filedAirspeedKts, units))
             KvRow(
                 // ETE = Estimated Time Enroute — the planned flight duration
                 // per the filed flight plan. Spelled out for clarity.

@@ -145,10 +145,18 @@ fun MapLibreFlightView(state: FlightMapUiState) {
         // This bypasses the SymbolManager entirely for the airborne marker so
         // there's no GL feature re-upload during rotation gestures and no
         // symbol-layer rotation/clipping artifacts to flash through.
+        //
+        // Show the plane icon whenever the flight is in the air — regardless of
+        // whether the lat/lon came from AeroAPI or the phone GPS. This means
+        // an offline passenger using GPS still sees a plane (positioned via
+        // their phone's location), not a generic GPS dot. The choice between
+        // "live aircraft tracking" and "your seat" is conveyed by the source
+        // label in the InfoOverlay above, not by the icon shape.
         val map = mapRef
         val loc = state.location
         val heading = state.headingDeg
-        if (map != null && loc != null && isAirborne(state) && heading != null) {
+        val showPlane = loc != null && shouldShowPlaneIcon(state)
+        if (map != null && loc != null && showPlane && heading != null) {
             // Read the tick to register a recomposition dependency on each
             // camera move — the value itself is unused.
             @Suppress("UNUSED_VARIABLE")
@@ -253,10 +261,11 @@ private fun applyState(
     }
 
     val loc = state.location
-    val airborne = isAirborne(state)
-    // GPS dot is only used for ground/landed states. The airborne plane is
-    // rendered above as a Compose overlay.
-    if (loc != null && !airborne) {
+    // GPS dot — shown only when we're NOT showing the plane overlay. The
+    // plane overlay covers both online (AeroAPI position) and offline-but-
+    // airborne (GPS position) cases, so the dot is reserved for "you're on
+    // the ground" states (pre-departure or post-arrival).
+    if (loc != null && !shouldShowPlaneIcon(state)) {
         val here = LatLng(loc.latitude, loc.longitude)
         val existing = rs.gpsSymbol
         if (existing == null) {
@@ -287,10 +296,17 @@ private fun applyState(
 }
 
 /**
- * Airborne = we've left the origin gate but haven't arrived.
- * Prefer wheels-up/wheels-down for accuracy; fall back to out/in for taxiing edge cases.
+ * Should the live position render as a plane (vs. GPS dot)?
+ *
+ * Two cases qualify, both based on locally-cached flight data so they work
+ * offline:
+ *   1. AeroAPI is currently feeding a live aircraft position — definitely a plane.
+ *   2. The flight has departed (cached `actualOff`/`actualOut`) and not yet
+ *      arrived (`actualIn`/`actualOn`) — the user is in the air, even if
+ *      we're only able to plot their phone's GPS at this moment.
  */
-private fun isAirborne(state: FlightMapUiState): Boolean {
+private fun shouldShowPlaneIcon(state: FlightMapUiState): Boolean {
+    if (state.positionSource == PositionSource.AIRCRAFT) return true
     val f = state.flight ?: return false
     if (f.cancelled) return false
     val departed = f.actualOff != null || f.actualOut != null

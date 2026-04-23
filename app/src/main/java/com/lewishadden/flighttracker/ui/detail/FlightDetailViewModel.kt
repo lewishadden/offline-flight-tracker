@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lewishadden.flighttracker.data.db.FlightDao
+import com.lewishadden.flighttracker.data.prefs.UnitSystem
+import com.lewishadden.flighttracker.data.prefs.UserPreferences
 import com.lewishadden.flighttracker.data.repository.AircraftPhoto
 import com.lewishadden.flighttracker.data.repository.AircraftPhotoRepository
 import com.lewishadden.flighttracker.data.repository.FlightRepository
@@ -34,8 +36,13 @@ class FlightDetailViewModel @Inject constructor(
     private val photoRepo: AircraftPhotoRepository,
     private val dao: FlightDao,
     private val subscriptionScheduler: FlightSubscriptionScheduler,
+    prefs: UserPreferences,
     savedState: SavedStateHandle,
 ) : ViewModel() {
+
+    val units: StateFlow<UnitSystem> = prefs.settings
+        .map { it.units }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UnitSystem.IMPERIAL)
 
     val faFlightId: String = checkNotNull(savedState["faFlightId"])
 

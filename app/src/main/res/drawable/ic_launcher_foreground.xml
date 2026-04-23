@@ -1,11 +1,83 @@
+<!--
+    Premium app icon foreground.
+    A clean plane silhouette tilted ~25° NE, set against a faint route arc.
+    Center of viewport (54, 54) is the rotation pivot — keeps the plane
+    visually balanced inside the adaptive-icon safe zone (radius ~33dp).
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group android:scaleX="3" android:scaleY="3" android:translateX="30" android:translateY="30">
+
+    <!-- Faint dotted route arc behind the plane. Drawn as a single arc-like
+         path with a dashed stroke. Sits inside the safe zone. -->
+    <path
+        android:pathData="M 30,82 Q 54,30 84,46"
+        android:strokeColor="#5555B9F7"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <!-- Origin dot for the arc -->
+    <path
+        android:pathData="M 30,82 m -3.2,0 a 3.2,3.2 0 1,0 6.4,0 a 3.2,3.2 0 1,0 -6.4,0 Z"
+        android:fillColor="#FFFFB86B" />
+    <!-- Destination dot for the arc -->
+    <path
+        android:pathData="M 84,46 m -3.2,0 a 3.2,3.2 0 1,0 6.4,0 a 3.2,3.2 0 1,0 -6.4,0 Z"
+        android:fillColor="#FF55B9F7" />
+
+    <!-- Plane group, rotated 25° clockwise around (54, 54).
+         Plane is designed pointing up, centered on (54, 54), bbox ~54×52. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:rotation="-25">
+
+        <!-- Soft outer glow (low-alpha sky blue silhouette slightly larger than plane) -->
         <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M21,16v-2l-8,-5V3.5C13,2.67 12.33,2 11.5,2S10,2.67 10,3.5V9l-8,5v2l8,-2.5V19l-2,1.5V22l3.5,-1L15,22v-1.5L13,19v-5.5L21,16z"/>
+            android:pathData="M54,26
+                L57,29 L57,46 L84,57 L84,62 L57,58 L57,72 L62,76 L62,78 L54,76 L46,78 L46,76 L51,72 L51,58 L24,62 L24,57 L51,46 L51,29 Z"
+            android:fillColor="#4055B9F7" />
+
+        <!-- Main plane body — sky blue with soft cyan-to-white gradient -->
+        <path
+            android:pathData="M54,28
+                L56.5,30.5 L56.5,45 L82,56 L82,60 L56.5,56.5 L56.5,71 L61,75 L61,77 L54,75 L47,77 L47,75 L51.5,71 L51.5,56.5 L26,60 L26,56 L51.5,45 L51.5,30.5 Z"
+            android:strokeColor="#FF0B1328"
+            android:strokeWidth="0.6">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="20" android:startY="40"
+                    android:endX="86" android:endY="76"
+                    android:startColor="#FFFFFFFF"
+                    android:endColor="#FF55B9F7" />
+            </aapt:attr>
+        </path>
+
+        <!-- Wing leading-edge highlights (left + right) for sense of light -->
+        <path
+            android:pathData="M51.5,46.5 L26.5,57 L26.5,57.5 L51.5,53.5 Z"
+            android:fillColor="#80FFFFFF" />
+        <path
+            android:pathData="M56.5,46.5 L81.5,57 L81.5,57.5 L56.5,53.5 Z"
+            android:fillColor="#80FFFFFF" />
+
+        <!-- Cockpit canopy -->
+        <path
+            android:pathData="M54,30.6
+                C54.9,30.6 55.5,31.2 55.5,32.1
+                L55.5,35.5
+                L52.5,35.5
+                L52.5,32.1
+                C52.5,31.2 53.1,30.6 54,30.6 Z"
+            android:fillColor="#FF0B1328" />
+
+        <!-- Fuselage centerline pinstripe -->
+        <path
+            android:pathData="M53.85,36 L53.85,71 L54.15,71 L54.15,36 Z"
+            android:fillColor="#80082045" />
     </group>
 </vector>

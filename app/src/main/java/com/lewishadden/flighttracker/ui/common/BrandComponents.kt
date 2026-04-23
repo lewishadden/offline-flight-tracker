@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -21,20 +23,25 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+// Color is used by BrandChip's `color: Color = ...` parameter.
 import androidx.compose.ui.unit.dp
-import com.lewishadden.flighttracker.ui.theme.Brand
-
-/** Full-bleed gradient background used as the root of branded screens. */
+/**
+ * Full-bleed gradient background used as the root of branded screens.
+ *
+ * Sources its colors from the active MaterialTheme so it switches cleanly
+ * between dark and light brand palettes (see Theme.kt).
+ */
 @Composable
 fun BrandBackground(content: @Composable () -> Unit) {
+    val cs = MaterialTheme.colorScheme
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    0f to Brand.IndigoDeep,
-                    0.55f to Brand.Surface,
-                    1f to Brand.SurfaceLo,
+                    0f to cs.background,
+                    0.55f to cs.surface,
+                    1f to cs.surfaceContainerLow,
                 )
             )
     ) {
@@ -48,20 +55,22 @@ fun BrandCard(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val cs = MaterialTheme.colorScheme
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
             .background(
                 Brush.linearGradient(
-                    0f to Color(0xFF1A2247),
-                    1f to Color(0xFF111732),
+                    0f to cs.surfaceContainer,
+                    1f to cs.surfaceContainerLow,
                 )
             )
-            .border(1.dp, Brand.Outline.copy(alpha = 0.6f), RoundedCornerShape(20.dp))
+            .border(1.dp, cs.outline.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
     ) {
-        // Force a light default content color inside the card so no nested Text
-        // falls back to a dark "on-surface" value from a parent Surface.
-        CompositionLocalProvider(LocalContentColor provides Brand.OnSurface) {
+        // Force the theme's onSurface as the default content color inside the
+        // card so no nested Text falls back to a dimmer LocalContentColor from
+        // an outer Surface override.
+        CompositionLocalProvider(LocalContentColor provides cs.onSurface) {
             content()
         }
     }
@@ -120,6 +129,38 @@ fun BrandChip(
             color = color,
         )
     }
+}
+
+/**
+ * Brand-styled switch with a clearly visible "off" state.
+ *
+ * Material 3's default unchecked Switch uses `outline` for the track and
+ * `outlineVariant` for the thumb — both very low-contrast on dark surfaces, so
+ * an off-but-active toggle reads identically to a disabled one. This styling
+ * gives "off" a luminous outlined thumb on a dim filled track that visually
+ * registers as a real toggle that just isn't currently on.
+ */
+@Composable
+fun BrandSwitch(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier,
+        enabled = enabled,
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+            checkedTrackColor = MaterialTheme.colorScheme.primary,
+            checkedBorderColor = MaterialTheme.colorScheme.primary,
+            uncheckedThumbColor = MaterialTheme.colorScheme.onSurface,
+            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            uncheckedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+    )
 }
 
 /** Empty-state placeholder used across list screens. */
