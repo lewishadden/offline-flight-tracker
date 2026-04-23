@@ -27,6 +27,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.lewishadden.flighttracker.R
 import com.lewishadden.flighttracker.di.MapStyleUrl
+import com.lewishadden.flighttracker.domain.isAirborneNow
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -298,20 +299,15 @@ private fun applyState(
 /**
  * Should the live position render as a plane (vs. GPS dot)?
  *
- * Two cases qualify, both based on locally-cached flight data so they work
- * offline:
+ * Two cases qualify, both safe offline:
  *   1. AeroAPI is currently feeding a live aircraft position — definitely a plane.
- *   2. The flight has departed (cached `actualOff`/`actualOut`) and not yet
- *      arrived (`actualIn`/`actualOn`) — the user is in the air, even if
- *      we're only able to plot their phone's GPS at this moment.
+ *   2. Cached flight data indicates the aircraft is in the air (see
+ *      [isAirborneNow] for the heuristic) — show a plane positioned via
+ *      whatever fallback source we have (typically the phone's GPS).
  */
 private fun shouldShowPlaneIcon(state: FlightMapUiState): Boolean {
     if (state.positionSource == PositionSource.AIRCRAFT) return true
-    val f = state.flight ?: return false
-    if (f.cancelled) return false
-    val departed = f.actualOff != null || f.actualOut != null
-    val arrived = f.actualOn != null || f.actualIn != null
-    return departed && !arrived
+    return state.flight?.isAirborneNow() == true
 }
 
 private fun vectorBitmap(context: Context, @DrawableRes resId: Int): Bitmap {

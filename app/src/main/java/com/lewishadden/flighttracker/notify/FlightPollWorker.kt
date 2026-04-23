@@ -14,6 +14,7 @@ import com.lewishadden.flighttracker.R
 import com.lewishadden.flighttracker.data.calendar.CalendarRepository
 import com.lewishadden.flighttracker.data.prefs.UserPreferences
 import com.lewishadden.flighttracker.data.repository.FlightRepository
+import com.lewishadden.flighttracker.domain.isAirborneNow
 import com.lewishadden.flighttracker.domain.model.Flight
 import com.lewishadden.flighttracker.util.NetworkMonitor
 import dagger.assisted.Assisted
@@ -70,8 +71,8 @@ class FlightPollWorker @AssistedInject constructor(
                 val changes = FlightChangeDetector.diff(refresh.previous, refresh.current)
                 notifier.notifyChanges(refresh.current.faFlightId, changes, settings)
 
-                // Live ongoing notification — show/refresh while airborne, dismiss when terminal.
-                if (settings.liveOngoingNotificationEnabled && isAirborne(refresh.current)) {
+                // Live ongoing notification — show/refresh while airborne, dismiss otherwise.
+                if (settings.liveOngoingNotificationEnabled && refresh.current.isAirborneNow()) {
                     ongoing.show(refresh.current)
                 } else {
                     ongoing.dismiss(refresh.current.faFlightId)
@@ -139,13 +140,6 @@ class FlightPollWorker @AssistedInject constructor(
         val reference = flight.estimatedOut ?: flight.scheduledOut ?: return DEFAULT_INTERVAL_MIN
         val minutesUntilDeparture = Duration.between(Instant.now(), reference).toMinutes()
         return if (minutesUntilDeparture in -60L..180L) TIGHT_INTERVAL_MIN else DEFAULT_INTERVAL_MIN
-    }
-
-    private fun isAirborne(flight: Flight): Boolean {
-        if (flight.cancelled) return false
-        val departed = flight.actualOff != null || flight.actualOut != null
-        val arrived = flight.actualOn != null || flight.actualIn != null
-        return departed && !arrived
     }
 
     private fun isTerminal(flight: Flight): Boolean {

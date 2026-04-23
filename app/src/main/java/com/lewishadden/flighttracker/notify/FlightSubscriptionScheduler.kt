@@ -9,8 +9,11 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.lewishadden.flighttracker.data.calendar.CalendarRepository
 import com.lewishadden.flighttracker.data.db.FlightDao
+import com.lewishadden.flighttracker.data.prefs.UserPreferences
 import com.lewishadden.flighttracker.data.repository.FlightRepository
+import com.lewishadden.flighttracker.domain.isAirborneNow
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.first
 import java.time.Duration
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,6 +30,8 @@ class FlightSubscriptionScheduler @Inject constructor(
     private val repo: FlightRepository,
     private val boardingReminders: BoardingReminderScheduler,
     private val calendar: CalendarRepository,
+    private val ongoing: OngoingFlightNotification,
+    private val prefs: UserPreferences,
 ) {
 
     private val workManager: WorkManager get() = WorkManager.getInstance(context)
@@ -35,9 +40,16 @@ class FlightSubscriptionScheduler @Inject constructor(
         repo.setSubscribed(faFlightId, true)
         scheduleNext(Duration.ofMinutes(FlightPollWorker.TIGHT_INTERVAL_MIN))
         // Best-effort sync of side effects — none of these should block the toggle.
-        repo.getFlightSnapshot(faFlightId)?.let {
-            boardingReminders.schedule(it)
-            calendar.upsertEvent(it)
+        repo.getFlightSnapshot(faFlightId)?.let { snap ->
+            boardingReminders.schedule(snap)
+            calendar.upsertEvent(snap)
+            // If the flight is already in the air when we subscribe, show the
+            // ongoing notification immediately rather than waiting up to 5 min
+            // for the first poll tick to fire it.
+            val settings = prefs.settings.first()
+            if (settings.liveOngoingNotificationEnabled && snap.isAirborneNow()) {
+                ongoing.show(snap)
+            }
         }
     }
 
@@ -45,6 +57,7 @@ class FlightSubscriptionScheduler @Inject constructor(
         repo.setSubscribed(faFlightId, false)
         boardingReminders.cancel(faFlightId)
         calendar.deleteEvent(faFlightId)
+        ongoing.dismiss(faFlightId)
         if (dao.countSubscribed() == 0) {
             workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
         }

@@ -9,6 +9,8 @@ import com.lewishadden.flighttracker.data.prefs.UnitSystem
 import com.lewishadden.flighttracker.data.prefs.UserPreferences
 import com.lewishadden.flighttracker.data.prefs.UserSettings
 import com.lewishadden.flighttracker.data.repository.FlightRepository
+import com.lewishadden.flighttracker.domain.isAirborneNow
+import com.lewishadden.flighttracker.notify.OngoingFlightNotification
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,6 +30,7 @@ class SettingsViewModel @Inject constructor(
     private val prefs: UserPreferences,
     private val calendar: CalendarRepository,
     private val repo: FlightRepository,
+    private val ongoing: OngoingFlightNotification,
 ) : ViewModel() {
 
     val settings: StateFlow<UserSettings> =
@@ -47,7 +50,18 @@ class SettingsViewModel @Inject constructor(
     fun setNotifyStatus(v: Boolean) = launch { prefs.setNotifyStatus(v) }
     fun setNotifyTimes(v: Boolean) = launch { prefs.setNotifyTimes(v) }
     fun setBoardingReminders(enabled: Boolean) = launch { prefs.setBoardingReminders(enabled) }
-    fun setLiveOngoingNotification(enabled: Boolean) = launch { prefs.setLiveOngoingNotification(enabled) }
+    fun setLiveOngoingNotification(enabled: Boolean) = launch {
+        prefs.setLiveOngoingNotification(enabled)
+        // Apply immediately rather than waiting for the next poll tick. Without
+        // this the toggle reads as broken — flipping it off leaves the existing
+        // notification on screen for up to 15 minutes.
+        val subscribed = repo.getSubscribedFlights()
+        if (enabled) {
+            subscribed.filter { it.isAirborneNow() }.forEach { ongoing.show(it) }
+        } else {
+            subscribed.forEach { ongoing.dismiss(it.faFlightId) }
+        }
+    }
     fun setPauseOnQuotaCap(enabled: Boolean) = launch { prefs.setPauseOnQuotaCap(enabled) }
 
     fun setCalendarIntegration(enabled: Boolean) = launch {

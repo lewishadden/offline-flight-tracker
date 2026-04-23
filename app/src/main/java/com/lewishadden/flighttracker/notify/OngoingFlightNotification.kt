@@ -15,6 +15,9 @@ import com.lewishadden.flighttracker.MainActivity
 import com.lewishadden.flighttracker.R
 import com.lewishadden.flighttracker.domain.model.Flight
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -44,21 +47,46 @@ class OngoingFlightNotification @Inject constructor(
         val origin = flight.origin.iata ?: flight.origin.icao ?: "—"
         val dest = flight.destination.iata ?: flight.destination.icao ?: "—"
         val pct = flight.progressPercent ?: 0
+        val arrivalInstant = flight.estimatedIn ?: flight.estimatedOn
+            ?: flight.scheduledIn ?: flight.scheduledOn
+        val nowMs = System.currentTimeMillis()
+        val arrivalMs = arrivalInstant?.toEpochMilli()
+
+        val delayText = flight.arrivalDelayMin?.let { d ->
+            when {
+                d > 0 -> "+${d}m late"
+                d < 0 -> "${d}m early"
+                else -> "On time"
+            }
+        }
+
+        // Stale-but-readable countdown in the body. The chronometer set below
+        // is the live-ticking version; this string is what shows in launchers
+        // / lock-screens that don't render the chronometer prominently.
+        val remainingText = arrivalMs?.let { ms ->
+            val msLeft = ms - nowMs
+            if (msLeft > 0) formatRemaining(msLeft) else null
+        }
+        val arrivesAtText = arrivalMs?.let { ms ->
+            val zone = runCatching { ZoneId.of(flight.destination.timezone ?: "UTC") }
+                .getOrDefault(ZoneId.systemDefault())
+            "arr " + DateTimeFormatter.ofPattern("HH:mm")
+                .withZone(zone)
+                .format(Instant.ofEpochMilli(ms))
+        }
+
         val statusLine = listOfNotNull(
             flight.status,
-            flight.arrivalDelayMin?.let { d ->
-                when {
-                    d > 0 -> "+${d}m late"
-                    d < 0 -> "${d}m early"
-                    else -> "On time"
-                }
-            },
+            delayText,
+            remainingText,
+            arrivesAtText,
         ).joinToString(" · ")
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("${flight.ident} · $origin → $dest")
             .setContentText(statusLine.ifEmpty { "In flight" })
+            .setStyle(NotificationCompat.BigTextStyle().bigText(statusLine.ifEmpty { "In flight" }))
             .setProgress(100, pct.coerceIn(0, 100), false)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -66,8 +94,31 @@ class OngoingFlightNotification @Inject constructor(
             .setContentIntent(pending)
             .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
 
+        // Live-ticking countdown in the notification's "when" slot. The system
+        // updates this every second on its own, so the user sees a smooth
+        // countdown without us having to repost the notification.
+        if (arrivalMs != null && arrivalMs > nowMs) {
+            builder.setWhen(arrivalMs)
+                .setShowWhen(true)
+                .setUsesChronometer(true)
+                .setChronometerCountDown(true)
+        } else {
+            builder.setShowWhen(false)
+        }
+
         NotificationManagerCompat.from(context)
             .notify(notificationId(flight.faFlightId), builder.build())
+    }
+
+    private fun formatRemaining(msLeft: Long): String {
+        val totalMin = msLeft / 60_000L
+        val h = totalMin / 60
+        val m = totalMin % 60
+        return when {
+            h == 0L -> "${m}m left"
+            m == 0L -> "${h}h left"
+            else -> "${h}h ${m}m left"
+        }
     }
 
     fun dismiss(faFlightId: String) {
