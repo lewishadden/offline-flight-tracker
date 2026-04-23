@@ -8,6 +8,7 @@ data class Flight(
     val operatorIata: String?,
     val flightNumber: String?,
     val aircraftType: String?,
+    val registration: String?,
     val origin: Airport,
     val destination: Airport,
     val scheduledOut: Instant?,

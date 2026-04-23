@@ -100,6 +100,13 @@ class FlightRepository @Inject constructor(
     suspend fun getLiveTrack(faFlightId: String): List<TrackPoint> =
         api.getTrack(faFlightId).positions.mapNotNull { it.toDomain() }
 
+    /**
+     * Latest known aircraft position from AeroAPI. Returns null if the API
+     * has no position fix yet (pre-departure or aircraft not transmitting).
+     */
+    suspend fun getLivePosition(faFlightId: String): TrackPoint? =
+        api.getPosition(faFlightId).lastPosition?.toDomain()
+
     fun observeFlight(faFlightId: String): Flow<FlightWithRoute?> =
         combine(
             dao.observeFlight(faFlightId),

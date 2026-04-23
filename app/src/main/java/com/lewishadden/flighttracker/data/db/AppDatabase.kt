@@ -8,7 +8,7 @@ import com.lewishadden.flighttracker.data.db.entities.RouteFixEntity
 
 @Database(
     entities = [FlightEntity::class, RouteFixEntity::class, OfflineRegionEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

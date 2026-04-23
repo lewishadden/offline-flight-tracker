@@ -26,6 +26,7 @@ fun FlightDto.toDomain(): Flight = Flight(
     operatorIata = operatorIata,
     flightNumber = flightNumber,
     aircraftType = aircraftType,
+    registration = registration,
     origin = origin?.toDomain() ?: Airport(null, null, null, null, null),
     destination = destination?.toDomain() ?: Airport(null, null, null, null, null),
     scheduledOut = scheduledOut.toInstantOrNull(),

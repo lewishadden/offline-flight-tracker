@@ -7,6 +7,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.lewishadden.flighttracker.data.calendar.CalendarRepository
 import com.lewishadden.flighttracker.data.db.FlightDao
 import com.lewishadden.flighttracker.data.repository.FlightRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -15,17 +16,17 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Manages the self-rescheduling [FlightPollWorker] chain.
- *
- * WorkManager's periodic minimum is 15 min, so we use a single one-time work unit
- * that re-enqueues itself after each run with an adaptive delay (15 min normally,
- * 5 min when any subscribed flight is in its boarding window).
+ * Single entry point for everything that should happen when a user subscribes
+ * to / unsubscribes from a flight: polling worker, boarding reminders, and the
+ * calendar event.
  */
 @Singleton
 class FlightSubscriptionScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val dao: FlightDao,
     private val repo: FlightRepository,
+    private val boardingReminders: BoardingReminderScheduler,
+    private val calendar: CalendarRepository,
 ) {
 
     private val workManager: WorkManager get() = WorkManager.getInstance(context)
@@ -33,10 +34,17 @@ class FlightSubscriptionScheduler @Inject constructor(
     suspend fun subscribe(faFlightId: String) {
         repo.setSubscribed(faFlightId, true)
         scheduleNext(Duration.ofMinutes(FlightPollWorker.TIGHT_INTERVAL_MIN))
+        // Best-effort sync of side effects — none of these should block the toggle.
+        repo.getFlightSnapshot(faFlightId)?.let {
+            boardingReminders.schedule(it)
+            calendar.upsertEvent(it)
+        }
     }
 
     suspend fun unsubscribe(faFlightId: String) {
         repo.setSubscribed(faFlightId, false)
+        boardingReminders.cancel(faFlightId)
+        calendar.deleteEvent(faFlightId)
         if (dao.countSubscribed() == 0) {
             workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
         }
@@ -56,8 +64,6 @@ class FlightSubscriptionScheduler @Inject constructor(
                 Duration.ofMinutes(5),
             )
             .build()
-        // REPLACE so calling subscribe() resets the clock to the tighter interval
-        // instead of waiting out the previously-scheduled 15-min tick.
         workManager.enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.REPLACE, request)
     }
 

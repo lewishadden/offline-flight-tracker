@@ -12,6 +12,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.lewishadden.flighttracker.FlightTrackerApp
 import com.lewishadden.flighttracker.MainActivity
 import com.lewishadden.flighttracker.R
+import com.lewishadden.flighttracker.data.prefs.UserSettings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -21,9 +22,16 @@ class FlightUpdateNotifier @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
 
-    fun notifyChanges(faFlightId: String, changes: List<FlightChange>) {
+    /**
+     * Posts notifications for [changes] respecting the user's per-event prefs
+     * in [settings]. Filters out muted event types silently.
+     */
+    fun notifyChanges(faFlightId: String, changes: List<FlightChange>, settings: UserSettings) {
         if (changes.isEmpty()) return
         if (!hasPostPermission()) return
+
+        val filtered = changes.filter { it.isAllowedBy(settings) }
+        if (filtered.isEmpty()) return
 
         val nm = NotificationManagerCompat.from(context)
         val pending = PendingIntent.getActivity(
@@ -35,7 +43,7 @@ class FlightUpdateNotifier @Inject constructor(
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
-        changes.forEach { change ->
+        filtered.forEach { change ->
             val notif = NotificationCompat.Builder(context, FlightTrackerApp.UPDATES_CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(change.title)
@@ -47,6 +55,16 @@ class FlightUpdateNotifier @Inject constructor(
                 .build()
             nm.notify(notificationId(faFlightId, change.key), notif)
         }
+    }
+
+    private fun FlightChange.isAllowedBy(s: UserSettings): Boolean = when (key) {
+        "gateOrigin", "gateDestination" -> s.notifyGateChanges
+        "terminalOrigin", "terminalDestination" -> s.notifyTerminalChanges
+        "baggageClaim" -> s.notifyBaggageClaim
+        "departureDelay", "arrivalDelay" -> s.notifyDelays
+        "estimatedOut", "estimatedOff", "estimatedOn", "estimatedIn" -> s.notifyTimeChanges
+        "status", "cancelled", "diverted" -> s.notifyStatusChanges
+        else -> true
     }
 
     private fun hasPostPermission(): Boolean {

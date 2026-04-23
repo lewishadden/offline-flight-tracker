@@ -105,6 +105,16 @@ data class TrackResponse(
     val positions: List<PositionDto> = emptyList()
 )
 
+/**
+ * Wraps the `/flights/{id}/position` response. AeroAPI returns the most
+ * recent position under `last_position` plus extra context fields we don't use.
+ */
+@Serializable
+data class FlightPositionResponse(
+    @SerialName("last_position") val lastPosition: PositionDto? = null,
+    val ident: String? = null,
+)
+
 @Serializable
 data class PositionDto(
     @SerialName("fa_flight_id") val faFlightId: String? = null,

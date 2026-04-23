@@ -12,6 +12,7 @@ data class FlightEntity(
     val operatorIata: String?,
     val flightNumber: String?,
     val aircraftType: String?,
+    val registration: String?,
     val originIcao: String?,
     val originIata: String?,
     val originName: String?,

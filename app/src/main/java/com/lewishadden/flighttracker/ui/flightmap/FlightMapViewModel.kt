@@ -8,33 +8,43 @@ import com.lewishadden.flighttracker.data.db.FlightDao
 import com.lewishadden.flighttracker.data.repository.FlightRepository
 import com.lewishadden.flighttracker.domain.model.Flight
 import com.lewishadden.flighttracker.domain.model.RouteFix
+import com.lewishadden.flighttracker.domain.model.TrackPoint
 import com.lewishadden.flighttracker.location.LocationController
 import com.lewishadden.flighttracker.util.Geo
 import com.lewishadden.flighttracker.util.LatLon
+import com.lewishadden.flighttracker.util.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+enum class PositionSource { NONE, AIRCRAFT, GPS }
 
 data class FlightMapUiState(
     val flight: Flight? = null,
     val route: List<RouteFix> = emptyList(),
     val densifiedPath: List<LatLon> = emptyList(),
     val location: Location? = null,
+    val positionSource: PositionSource = PositionSource.NONE,
     val progressAlongRouteKm: Double? = null,
     val totalRouteKm: Double? = null,
     val crossTrackKm: Double? = null,
+    /** Bearing along the route at the user's projected position, for plane marker rotation. */
+    val headingDeg: Float? = null,
     val hasOfflineRegion: Boolean = false,
 )
 
 @HiltViewModel
 class FlightMapViewModel @Inject constructor(
     private val repo: FlightRepository,
+    private val networkMonitor: NetworkMonitor,
     dao: FlightDao,
     savedState: SavedStateHandle,
 ) : ViewModel() {
@@ -63,26 +73,92 @@ class FlightMapViewModel @Inject constructor(
                 )
             }
         }
+
+        // Phone GPS — used directly when offline OR when no aircraft fix yet.
         viewModelScope.launch {
             LocationController.currentLocation.collect { loc ->
                 loc ?: return@collect
-                val path = _state.value.densifiedPath
-                if (path.size >= 2) {
-                    val here = LatLon(loc.latitude, loc.longitude)
-                    val nearest = Geo.nearestPointOnPolyline(path, here)
-                    if (nearest != null) {
-                        val km = cumulativeKmTo(path, nearest.segmentIndex, nearest.segmentT)
-                        _state.value = _state.value.copy(
-                            location = loc,
-                            progressAlongRouteKm = km,
-                            crossTrackKm = nearest.crossTrackKm,
-                        )
-                        return@collect
-                    }
+                if (_state.value.positionSource == PositionSource.AIRCRAFT) {
+                    // We have a live aircraft fix from AeroAPI — keep using that.
+                    return@collect
                 }
-                _state.value = _state.value.copy(location = loc)
+                applyPosition(loc.latitude, loc.longitude, source = PositionSource.GPS, raw = loc)
             }
         }
+
+        // Live aircraft position polling — only when online + airborne.
+        viewModelScope.launch { liveAircraftPositionLoop() }
+    }
+
+    /**
+     * Polls AeroAPI's `/flights/{id}/position` endpoint while the flight is
+     * airborne and the device is online. Falls silent (releasing back to GPS)
+     * when offline or pre-departure / post-arrival.
+     */
+    private suspend fun liveAircraftPositionLoop() {
+        while (viewModelScope.isActive) {
+            val flight = _state.value.flight
+            val online = networkMonitor.snapshot().online
+            val airborne = flight != null && isAirborne(flight)
+
+            if (!online || !airborne) {
+                // Step down to GPS if we were on aircraft source.
+                if (_state.value.positionSource == PositionSource.AIRCRAFT) {
+                    _state.value = _state.value.copy(positionSource = PositionSource.GPS)
+                }
+                delay(POLL_OFF_MS)
+                continue
+            }
+
+            runCatching { repo.getLivePosition(faFlightId) }
+                .onSuccess { tp ->
+                    if (tp != null) {
+                        val asLocation = Location("aeroapi").apply {
+                            latitude = tp.lat
+                            longitude = tp.lon
+                            tp.altitudeFt100?.let { altitude = (it * 100).toDouble() * 0.3048 }
+                            tp.groundspeedKts?.let { speed = (it * 0.514444).toFloat() }
+                            tp.headingDeg?.let { bearing = it.toFloat() }
+                            time = tp.timestamp.toEpochMilli()
+                        }
+                        applyPosition(tp.lat, tp.lon, source = PositionSource.AIRCRAFT, raw = asLocation)
+                    }
+                }
+
+            delay(POLL_LIVE_MS)
+        }
+    }
+
+    private fun applyPosition(lat: Double, lon: Double, source: PositionSource, raw: Location) {
+        val path = _state.value.densifiedPath
+        if (path.size >= 2) {
+            val here = LatLon(lat, lon)
+            val nearest = Geo.nearestPointOnPolyline(path, here)
+            if (nearest != null) {
+                val km = cumulativeKmTo(path, nearest.segmentIndex, nearest.segmentT)
+                val segStart = path[nearest.segmentIndex]
+                val segEnd = path.getOrNull(nearest.segmentIndex + 1) ?: segStart
+                val heading = if (segStart != segEnd) {
+                    Geo.bearingDeg(segStart, segEnd).toFloat()
+                } else null
+                _state.value = _state.value.copy(
+                    location = raw,
+                    positionSource = source,
+                    progressAlongRouteKm = km,
+                    crossTrackKm = nearest.crossTrackKm,
+                    headingDeg = heading,
+                )
+                return
+            }
+        }
+        _state.value = _state.value.copy(location = raw, positionSource = source)
+    }
+
+    private fun isAirborne(flight: Flight): Boolean {
+        if (flight.cancelled) return false
+        val departed = flight.actualOff != null || flight.actualOut != null
+        val arrived = flight.actualOn != null || flight.actualIn != null
+        return departed && !arrived
     }
 
     private fun buildPath(flight: Flight, route: List<RouteFix>): List<LatLon> {
@@ -107,5 +183,16 @@ class FlightMapViewModel @Inject constructor(
             sum += Geo.haversineKm(path[segIndex], path[segIndex + 1]) * t
         }
         return sum
+    }
+
+    /** Promote a track point we already have (e.g. seeded once we mount). */
+    @Suppress("unused") private fun promote(tp: TrackPoint) = Unit
+
+    companion object {
+        // Live aircraft position cadence — 30 s in flight is plenty given AeroAPI
+        // updates the underlying position every ~minute.
+        private const val POLL_LIVE_MS = 30_000L
+        // When not airborne or offline, back off so we're not pinging AeroAPI for nothing.
+        private const val POLL_OFF_MS = 60_000L
     }
 }

@@ -2,6 +2,7 @@ package com.lewishadden.flighttracker.data.api
 
 import com.lewishadden.flighttracker.data.api.dto.AccountUsageDto
 import com.lewishadden.flighttracker.data.api.dto.AirportInfoDto
+import com.lewishadden.flighttracker.data.api.dto.FlightPositionResponse
 import com.lewishadden.flighttracker.data.api.dto.FlightsResponse
 import com.lewishadden.flighttracker.data.api.dto.RouteResponse
 import com.lewishadden.flighttracker.data.api.dto.TrackResponse
@@ -29,6 +30,16 @@ interface AeroApiService {
         @Path("faFlightId") faFlightId: String,
         @Query("include_estimated_positions") includeEstimated: Boolean = true
     ): TrackResponse
+
+    /**
+     * Last known position of the aircraft. Lighter than the full track —
+     * one position object, refreshed every minute or so by AeroAPI's data
+     * pipeline. Used for live in-flight tracking.
+     */
+    @GET("flights/{faFlightId}/position")
+    suspend fun getPosition(
+        @Path("faFlightId") faFlightId: String
+    ): FlightPositionResponse
 
     @GET("airports/{id}")
     suspend fun getAirport(

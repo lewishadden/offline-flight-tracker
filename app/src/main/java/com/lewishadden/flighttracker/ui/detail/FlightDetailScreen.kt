@@ -4,22 +4,31 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
+import com.lewishadden.flighttracker.data.repository.AircraftPhoto
+import com.lewishadden.flighttracker.ui.theme.Brand
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowRightAlt
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Luggage
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -137,8 +146,15 @@ fun FlightDetailScreen(
                         flight = flight,
                         refreshing = ui.refreshing,
                         hasOffline = hasOffline,
+                        subscribed = subscribed,
+                        photo = ui.photo,
                         onPreDownload = { onPreDownload(vm.faFlightId) },
                         onOpenMap = { onOpenMap(vm.faFlightId) },
+                        onPrepareForTrip = {
+                            vm.prepareForTrip(
+                                onReadyForOfflineDownload = { onPreDownload(vm.faFlightId) }
+                            )
+                        },
                     )
                 }
             }
@@ -151,8 +167,11 @@ private fun FlightDetailContent(
     flight: Flight,
     refreshing: Boolean,
     hasOffline: Boolean,
+    subscribed: Boolean,
+    photo: AircraftPhoto?,
     onPreDownload: () -> Unit,
     onOpenMap: () -> Unit,
+    onPrepareForTrip: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -164,12 +183,22 @@ private fun FlightDetailContent(
     ) {
         if (refreshing) LinearProgressIndicator(Modifier.fillMaxWidth())
 
+        if (photo != null) AircraftPhotoCard(photo, flight.registration, flight.aircraftType)
         HeroCard(flight)
         DepartureCard(flight)
         ArrivalCard(flight)
         AircraftCard(flight)
 
         Spacer(Modifier.height(2.dp))
+        // Trip Mode — one tap to subscribe + download offline map. Hidden once
+        // both are already done (the user is already prepared).
+        if (!subscribed || !hasOffline) {
+            PrimaryButton(
+                text = "Prepare for trip",
+                icon = Icons.Default.Luggage,
+                onClick = onPrepareForTrip,
+            )
+        }
         if (hasOffline) {
             PrimaryButton(
                 text = "Open flight map",
@@ -379,13 +408,83 @@ private fun AircraftCard(flight: Flight) {
         ) {
             SectionHeader("Aircraft & route")
             KvRow("Type", flight.aircraftType ?: "—")
-            KvRow("Distance", flight.routeDistanceNm?.let { "$it nm" } ?: "—")
-            KvRow("Filed altitude", flight.filedAltitudeFt100?.let { "FL${"%03d".format(it)}" } ?: "—")
-            KvRow("Filed speed", flight.filedAirspeedKts?.let { "$it kts" } ?: "—")
             KvRow(
-                "ETE",
-                flight.filedEteSec?.let { sec -> "%d:%02d".format(sec / 3600, (sec % 3600) / 60) } ?: "—",
+                "Distance",
+                // AeroAPI returns route distance in nautical miles. Convert to
+                // statute miles (the everyday "mile") for display.
+                flight.routeDistanceNm?.let { "%,d mi".format((it * 1.15078).toInt()) } ?: "—",
             )
+            KvRow(
+                "Filed altitude",
+                // filedAltitudeFt100 is in hundreds of feet (e.g. 350 = FL350 = 35,000 ft).
+                flight.filedAltitudeFt100?.let { "%,d ft".format(it * 100) } ?: "—",
+            )
+            KvRow(
+                "Filed speed",
+                // Filed airspeed is in knots; convert to mph.
+                flight.filedAirspeedKts?.let { "%,d mph".format((it * 1.15078).toInt()) } ?: "—",
+            )
+            KvRow(
+                // ETE = Estimated Time Enroute — the planned flight duration
+                // per the filed flight plan. Spelled out for clarity.
+                "Flight time",
+                flight.filedEteSec?.let { sec -> "%d h %02d m".format(sec / 3600, (sec % 3600) / 60) } ?: "—",
+            )
+        }
+    }
+}
+
+@Composable
+private fun AircraftPhotoCard(
+    photo: AircraftPhoto,
+    registration: String?,
+    aircraftType: String?,
+) {
+    val url = photo.largeUrl ?: photo.thumbUrl ?: return
+    BrandCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 10f)
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                    .background(Brand.SurfaceLo),
+            ) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = "Aircraft photo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            // Attribution strip — Planespotters' free API requires crediting
+            // the photographer when displaying their image.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column {
+                    val title = listOfNotNull(registration, aircraftType).joinToString(" · ")
+                    if (title.isNotEmpty()) {
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    photo.photographer?.let {
+                        Text(
+                            "Photo: $it · planespotters.net",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -400,8 +499,11 @@ private fun PrimaryButton(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+            // Dark indigo button with bright Sky text — reads as a premium dark
+            // surface with a luminous accent, rather than dark text on a light
+            // Sky button (which looked black against the dark-blue page bg).
+            containerColor = Color(0xFF1B2447),
+            contentColor = MaterialTheme.colorScheme.primary,
         ),
     ) {
         Icon(icon, null)

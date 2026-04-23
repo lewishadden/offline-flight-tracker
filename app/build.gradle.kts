@@ -108,4 +108,7 @@ dependencies {
     implementation(libs.work.runtime)
     implementation(libs.hilt.work)
     ksp(libs.hilt.androidx.compiler)
+
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network)
 }

@@ -123,7 +123,41 @@ fun FlightMapScreen(
             } else {
                 MapLibreFlightView(state)
                 InfoOverlay(state)
+                state.flight?.takeIf { it.diverted }?.let { f ->
+                    DivertedBanner(
+                        destinationName = f.destination.city
+                            ?: f.destination.iata
+                            ?: f.destination.icao,
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun DivertedBanner(destinationName: String?) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, start = 12.dp, end = 12.dp)
+            .background(MaterialTheme.colorScheme.error, RoundedCornerShape(10.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "DIVERTED",
+            color = Color.White,
+            fontWeight = FontWeight.ExtraBold,
+            style = MaterialTheme.typography.labelSmall,
+        )
+        if (destinationName != null) {
+            Text(
+                "  →  $destinationName",
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 }

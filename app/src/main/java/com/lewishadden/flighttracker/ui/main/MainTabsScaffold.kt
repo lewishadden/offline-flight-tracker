@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lewishadden.flighttracker.ui.offline.OfflineFlightsScreen
 import com.lewishadden.flighttracker.ui.search.SearchScreen
+import com.lewishadden.flighttracker.ui.settings.SettingsScreen
 import com.lewishadden.flighttracker.ui.subscribed.WatchedFlightsScreen
 import com.lewishadden.flighttracker.ui.theme.Brand
 import com.lewishadden.flighttracker.ui.usage.AccountUsageScreen
@@ -36,6 +38,7 @@ private enum class Tab(val label: String, val icon: ImageVector) {
     WATCHED("Watched", Icons.Default.NotificationsActive),
     OFFLINE("Offline", Icons.Default.CloudDownload),
     USAGE("Usage", Icons.Default.DataUsage),
+    SETTINGS("Settings", Icons.Default.Settings),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,6 +89,7 @@ fun MainTabsScaffold(
                     onOpenDetail = onOpenFlight,
                 )
                 Tab.USAGE -> AccountUsageScreen(vm = hiltViewModel())
+                Tab.SETTINGS -> SettingsScreen(vm = hiltViewModel())
             }
         }
     }

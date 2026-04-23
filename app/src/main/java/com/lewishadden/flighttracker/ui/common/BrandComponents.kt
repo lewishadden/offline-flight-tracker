@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,7 +59,11 @@ fun BrandCard(
             )
             .border(1.dp, Brand.Outline.copy(alpha = 0.6f), RoundedCornerShape(20.dp))
     ) {
-        content()
+        // Force a light default content color inside the card so no nested Text
+        // falls back to a dark "on-surface" value from a parent Surface.
+        CompositionLocalProvider(LocalContentColor provides Brand.OnSurface) {
+            content()
+        }
     }
 }
 

@@ -29,6 +29,21 @@ object Geo {
 
     private const val EARTH_RADIUS_KM = 6371.0088
 
+    /**
+     * Initial great-circle bearing from [a] to [b], in degrees clockwise from
+     * true north, normalized to [0, 360). Used to orient the in-flight plane
+     * marker along the current route segment.
+     */
+    fun bearingDeg(a: LatLon, b: LatLon): Double {
+        val lat1 = Math.toRadians(a.lat)
+        val lat2 = Math.toRadians(b.lat)
+        val dLon = Math.toRadians(b.lon - a.lon)
+        val y = sin(dLon) * cos(lat2)
+        val x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
+        val brg = Math.toDegrees(atan2(y, x))
+        return (brg + 360.0) % 360.0
+    }
+
     fun haversineKm(a: LatLon, b: LatLon): Double {
         val dLat = Math.toRadians(b.lat - a.lat)
         val dLon = Math.toRadians(b.lon - a.lon)

@@ -1,11 +1,74 @@
+<!--
+    Plane marker, pointing north (up) at rotate=0.
+    Visual center is aligned to the drawable center (28, 28) so the icon
+    rotates cleanly in place instead of swinging through an arc.
+    Bbox: x [2, 54], y [3, 53].  Midpoint = (28, 28). ✓
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="44dp"
-    android:height="44dp"
-    android:viewportWidth="48"
-    android:viewportHeight="48">
+    android:width="56dp"
+    android:height="56dp"
+    android:viewportWidth="56"
+    android:viewportHeight="56">
+
+    <!-- Soft glow (baked in because iconHalo* on SymbolOptions only applies to
+         SDF icons, not raster bitmaps). Drawn as an outer amber silhouette
+         with low alpha for a luminous aura on any basemap. -->
     <path
-        android:fillColor="#FFFFB86B"
-        android:strokeColor="#FF0B1328"
-        android:strokeWidth="2"
-        android:pathData="M24,4 L27,22 L44,28 L44,32 L27,29 L26,40 L31,43 L31,45 L24,43 L17,45 L17,43 L22,40 L21,29 L4,32 L4,28 L21,22 Z"/>
+        android:fillColor="#3DFFB86B"
+        android:pathData="M28,0
+            L31.5,3.5 L31.5,16 L56,28 L56,33 L31.5,30.5 L31.5,46
+            L39,51 L39,53 L28,51 L17,53 L17,51 L24.5,46 L24.5,30.5
+            L0,33 L0,28 L24.5,16 L24.5,3.5 Z" />
+
+    <!-- Main plane silhouette: amber fill with dark brand-indigo stroke -->
+    <path
+        android:fillColor="#FFB86B"
+        android:strokeColor="#0B1328"
+        android:strokeWidth="1.4"
+        android:pathData="M28,3
+            L30,5.5 L30,17 L54,29 L54,32 L30,30 L30,45
+            L37,50 L37,51.5 L28,49.5 L19,51.5 L19,50 L26,45 L26,30
+            L2,32 L2,29 L26,17 L26,5.5 Z" />
+
+    <!-- Wing leading-edge highlight (left) — brighter amber for 3D feel -->
+    <path
+        android:fillColor="#FFD59B"
+        android:pathData="M26,18 L3,29.2 L3,29.6 L26,26 Z" />
+    <!-- Wing leading-edge highlight (right) -->
+    <path
+        android:fillColor="#FFD59B"
+        android:pathData="M30,18 L53,29.2 L53,29.6 L30,26 Z" />
+
+    <!-- Tailplane highlight (left) -->
+    <path
+        android:fillColor="#FFD59B"
+        android:pathData="M26,31 L19.5,50.3 L20,50.3 L26,36 Z" />
+    <!-- Tailplane highlight (right) -->
+    <path
+        android:fillColor="#FFD59B"
+        android:pathData="M30,31 L36.5,50.3 L36,50.3 L30,36 Z" />
+
+    <!-- Cockpit canopy -->
+    <path
+        android:fillColor="#0B1328"
+        android:pathData="M28,5.2
+            C28.8,5.2 29.3,5.7 29.3,6.4
+            L29.3,10
+            L26.7,10
+            L26.7,6.4
+            C26.7,5.7 27.2,5.2 28,5.2 Z" />
+
+    <!-- Fuselage centerline stripe (subtle) -->
+    <path
+        android:fillColor="#CC6B3A"
+        android:pathData="M27.85,11.5 L27.85,44.5 L28.15,44.5 L28.15,11.5 Z" />
+
+    <!-- Engine pod (left, under wing) -->
+    <path
+        android:fillColor="#0B1328"
+        android:pathData="M17,23 L17,26.5 L13.5,27.3 L13.5,22.2 Z" />
+    <!-- Engine pod (right) -->
+    <path
+        android:fillColor="#0B1328"
+        android:pathData="M39,23 L39,26.5 L42.5,27.3 L42.5,22.2 Z" />
 </vector>

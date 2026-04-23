@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lewishadden.flighttracker.data.db.FlightDao
+import com.lewishadden.flighttracker.data.repository.AircraftPhoto
+import com.lewishadden.flighttracker.data.repository.AircraftPhotoRepository
 import com.lewishadden.flighttracker.data.repository.FlightRepository
 import com.lewishadden.flighttracker.data.repository.FlightWithRoute
 import com.lewishadden.flighttracker.notify.FlightSubscriptionScheduler
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -21,12 +24,14 @@ data class DetailUiState(
     val refreshing: Boolean = false,
     val data: FlightWithRoute? = null,
     val hasOfflineRegion: Boolean = false,
+    val photo: AircraftPhoto? = null,
     val error: String? = null,
 )
 
 @HiltViewModel
 class FlightDetailViewModel @Inject constructor(
     private val repo: FlightRepository,
+    private val photoRepo: AircraftPhotoRepository,
     private val dao: FlightDao,
     private val subscriptionScheduler: FlightSubscriptionScheduler,
     savedState: SavedStateHandle,
@@ -51,6 +56,17 @@ class FlightDetailViewModel @Inject constructor(
                 _ui.value = _ui.value.copy(data = data)
             }
         }
+        // When the registration becomes known (post-refresh), look up the photo.
+        // Re-fires only when the registration string actually changes.
+        viewModelScope.launch {
+            repo.observeFlight(faFlightId)
+                .map { it?.flight?.registration }
+                .distinctUntilChanged()
+                .collect { reg ->
+                    val photo = photoRepo.fetchByRegistration(reg)
+                    _ui.value = _ui.value.copy(photo = photo)
+                }
+        }
         refresh()
     }
 
@@ -71,6 +87,23 @@ class FlightDetailViewModel @Inject constructor(
                 subscriptionScheduler.unsubscribe(faFlightId)
             } else {
                 subscriptionScheduler.subscribe(faFlightId)
+            }
+        }
+    }
+
+    /**
+     * Trip Mode — refresh latest data + subscribe (which fans out to boarding
+     * reminders, polling, and calendar event creation). Offline map download
+     * is handled by the caller navigating to the PreDownload screen.
+     */
+    fun prepareForTrip(onReadyForOfflineDownload: () -> Unit) {
+        viewModelScope.launch {
+            runCatching { repo.refreshFlight(faFlightId) }
+            if (!subscribed.value) {
+                subscriptionScheduler.subscribe(faFlightId)
+            }
+            if (!hasOfflineRegion.value) {
+                onReadyForOfflineDownload()
             }
         }
     }
