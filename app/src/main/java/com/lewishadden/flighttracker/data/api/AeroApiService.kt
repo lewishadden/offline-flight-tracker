@@ -1,5 +1,6 @@
 package com.lewishadden.flighttracker.data.api
 
+import com.lewishadden.flighttracker.data.api.dto.AccountUsageDto
 import com.lewishadden.flighttracker.data.api.dto.AirportInfoDto
 import com.lewishadden.flighttracker.data.api.dto.FlightsResponse
 import com.lewishadden.flighttracker.data.api.dto.RouteResponse
@@ -33,4 +34,7 @@ interface AeroApiService {
     suspend fun getAirport(
         @Path("id") id: String
     ): AirportInfoDto
+
+    @GET("account/usage")
+    suspend fun getAccountUsage(): AccountUsageDto
 }

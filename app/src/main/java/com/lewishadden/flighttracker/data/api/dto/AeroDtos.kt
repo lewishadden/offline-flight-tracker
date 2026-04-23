@@ -92,6 +92,15 @@ data class RouteFixDto(
 )
 
 @Serializable
+data class AccountUsageDto(
+    @SerialName("total_cost") val totalCost: Double? = null,
+    @SerialName("plan_cap") val planCap: Double? = null,
+    @SerialName("plan_overage_enabled") val planOverageEnabled: Boolean? = null,
+    @SerialName("period_start") val periodStart: String? = null,
+    @SerialName("period_end") val periodEnd: String? = null,
+)
+
+@Serializable
 data class TrackResponse(
     val positions: List<PositionDto> = emptyList()
 )

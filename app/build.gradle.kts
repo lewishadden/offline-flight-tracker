@@ -104,4 +104,8 @@ dependencies {
 
     implementation(libs.play.services.location)
     implementation(libs.datastore.preferences)
+
+    implementation(libs.work.runtime)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.androidx.compiler)
 }

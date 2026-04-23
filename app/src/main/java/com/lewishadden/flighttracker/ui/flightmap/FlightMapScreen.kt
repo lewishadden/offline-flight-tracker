@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lewishadden.flighttracker.location.LocationController
+import com.lewishadden.flighttracker.ui.theme.Brand
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,15 +73,32 @@ fun FlightMapScreen(
         onDispose { /* keep service running for background tracking */ }
     }
 
+    // Debounce the back press — MapView.onDestroy() briefly holds the UI thread
+    // during the Compose exit transition, so without this guard repeated taps
+    // would queue up while the first pop is still in flight.
+    var backConsumed by remember { mutableStateOf(false) }
+    val handleBack = {
+        if (!backConsumed) {
+            backConsumed = true
+            onBack()
+        }
+    }
+
     Scaffold(
+        containerColor = Brand.IndigoDeep,
         topBar = {
             TopAppBar(
                 title = { Text(state.flight?.ident ?: "Flight map") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = handleBack, enabled = !backConsumed) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Brand.IndigoDeep,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+                ),
             )
         }
     ) { pad ->
@@ -87,6 +106,9 @@ fun FlightMapScreen(
             modifier = Modifier
                 .padding(pad)
                 .fillMaxSize()
+                // Solid dark backdrop so any brief GL re-render during rotation
+                // blends with the theme instead of showing a lighter surface.
+                .background(Brand.IndigoDeep)
         ) {
             if (!permissionGranted) {
                 PermissionRequest(onGrant = {

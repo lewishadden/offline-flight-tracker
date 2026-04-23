@@ -54,6 +54,7 @@ data class FlightEntity(
     val filedAltitudeFt100: Int?,
     val filedAirspeedKts: Int?,
     val lastFetchedEpochMs: Long,
+    val subscribed: Boolean = false,
 )
 
 @Entity(

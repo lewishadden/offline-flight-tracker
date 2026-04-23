@@ -55,6 +55,7 @@ fun Flight.toEntity(nowMs: Long = System.currentTimeMillis()) = FlightEntity(
     filedAltitudeFt100 = filedAltitudeFt100,
     filedAirspeedKts = filedAirspeedKts,
     lastFetchedEpochMs = nowMs,
+    subscribed = subscribed,
 )
 
 fun FlightEntity.toDomain() = Flight(
@@ -92,6 +93,7 @@ fun FlightEntity.toDomain() = Flight(
     filedEteSec = filedEteSec,
     filedAltitudeFt100 = filedAltitudeFt100,
     filedAirspeedKts = filedAirspeedKts,
+    subscribed = subscribed,
 )
 
 fun List<RouteFix>.toEntities(faFlightId: String): List<RouteFixEntity> =

@@ -9,11 +9,11 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.lewishadden.flighttracker.ui.detail.FlightDetailScreen
 import com.lewishadden.flighttracker.ui.flightmap.FlightMapScreen
+import com.lewishadden.flighttracker.ui.main.MainTabsScaffold
 import com.lewishadden.flighttracker.ui.predownload.PreDownloadScreen
-import com.lewishadden.flighttracker.ui.search.SearchScreen
 
 object Routes {
-    const val SEARCH = "search"
+    const val HOME = "home"
     const val DETAIL = "detail/{faFlightId}"
     const val PREDOWNLOAD = "predownload/{faFlightId}"
     const val MAP = "map/{faFlightId}"
@@ -25,11 +25,11 @@ object Routes {
 @Composable
 fun FlightTrackerNavHost() {
     val nav = rememberNavController()
-    NavHost(navController = nav, startDestination = Routes.SEARCH) {
-        composable(Routes.SEARCH) {
-            SearchScreen(
-                vm = hiltViewModel(),
+    NavHost(navController = nav, startDestination = Routes.HOME) {
+        composable(Routes.HOME) {
+            MainTabsScaffold(
                 onOpenFlight = { nav.navigate(Routes.detail(it)) },
+                onOpenMap = { nav.navigate(Routes.map(it)) },
             )
         }
         composable(

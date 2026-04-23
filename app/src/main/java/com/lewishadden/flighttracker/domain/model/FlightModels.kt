@@ -37,6 +37,7 @@ data class Flight(
     val filedEteSec: Int?,
     val filedAltitudeFt100: Int?,
     val filedAirspeedKts: Int?,
+    val subscribed: Boolean = false,
 )
 
 data class Airport(

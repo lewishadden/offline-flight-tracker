@@ -25,6 +25,21 @@ interface FlightDao {
     @Query("SELECT * FROM flights ORDER BY scheduledOut DESC")
     fun observeAllFlights(): Flow<List<FlightEntity>>
 
+    @Query("UPDATE flights SET subscribed = :subscribed WHERE faFlightId = :id")
+    suspend fun setSubscribed(id: String, subscribed: Boolean)
+
+    @Query("SELECT * FROM flights WHERE subscribed = 1")
+    suspend fun getSubscribedFlights(): List<FlightEntity>
+
+    @Query("SELECT * FROM flights WHERE subscribed = 1 ORDER BY scheduledOut ASC")
+    fun observeSubscribedFlights(): Flow<List<FlightEntity>>
+
+    @Query("SELECT * FROM offline_regions ORDER BY completedEpochMs DESC")
+    fun observeOfflineRegions(): Flow<List<OfflineRegionEntity>>
+
+    @Query("SELECT COUNT(*) FROM flights WHERE subscribed = 1")
+    suspend fun countSubscribed(): Int
+
     @Query("DELETE FROM route_fixes WHERE faFlightId = :id")
     suspend fun deleteRouteFor(id: String)
 

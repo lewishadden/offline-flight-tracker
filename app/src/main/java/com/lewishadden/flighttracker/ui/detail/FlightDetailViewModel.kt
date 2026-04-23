@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.lewishadden.flighttracker.data.db.FlightDao
 import com.lewishadden.flighttracker.data.repository.FlightRepository
 import com.lewishadden.flighttracker.data.repository.FlightWithRoute
+import com.lewishadden.flighttracker.notify.FlightSubscriptionScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,6 +28,7 @@ data class DetailUiState(
 class FlightDetailViewModel @Inject constructor(
     private val repo: FlightRepository,
     private val dao: FlightDao,
+    private val subscriptionScheduler: FlightSubscriptionScheduler,
     savedState: SavedStateHandle,
 ) : ViewModel() {
 
@@ -37,6 +39,10 @@ class FlightDetailViewModel @Inject constructor(
 
     val hasOfflineRegion: StateFlow<Boolean> = dao.observeOfflineRegion(faFlightId)
         .map { it != null }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val subscribed: StateFlow<Boolean> = repo.observeFlight(faFlightId)
+        .map { it?.flight?.subscribed == true }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     init {
@@ -56,6 +62,16 @@ class FlightDetailViewModel @Inject constructor(
                     _ui.value = _ui.value.copy(error = it.message ?: "Refresh failed")
                 }
             _ui.value = _ui.value.copy(refreshing = false)
+        }
+    }
+
+    fun toggleSubscription() {
+        viewModelScope.launch {
+            if (subscribed.value) {
+                subscriptionScheduler.unsubscribe(faFlightId)
+            } else {
+                subscriptionScheduler.subscribe(faFlightId)
+            }
         }
     }
 }
