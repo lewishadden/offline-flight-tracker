@@ -59,7 +59,7 @@ class BoardingReminderWorker @AssistedInject constructor(
         )
 
         val notif = NotificationCompat.Builder(applicationContext, FlightTrackerApp.UPDATES_CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_flight)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))

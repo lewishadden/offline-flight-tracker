@@ -10,6 +10,7 @@ import com.lewishadden.flighttracker.data.prefs.UserPreferences
 import com.lewishadden.flighttracker.data.prefs.UserSettings
 import com.lewishadden.flighttracker.data.repository.FlightRepository
 import com.lewishadden.flighttracker.domain.isAirborneNow
+import com.lewishadden.flighttracker.notify.BoardingReminderScheduler
 import com.lewishadden.flighttracker.notify.OngoingFlightNotification
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,7 @@ class SettingsViewModel @Inject constructor(
     private val calendar: CalendarRepository,
     private val repo: FlightRepository,
     private val ongoing: OngoingFlightNotification,
+    private val boardingReminders: BoardingReminderScheduler,
 ) : ViewModel() {
 
     val settings: StateFlow<UserSettings> =
@@ -49,7 +51,18 @@ class SettingsViewModel @Inject constructor(
     fun setNotifyDelays(v: Boolean) = launch { prefs.setNotifyDelays(v) }
     fun setNotifyStatus(v: Boolean) = launch { prefs.setNotifyStatus(v) }
     fun setNotifyTimes(v: Boolean) = launch { prefs.setNotifyTimes(v) }
-    fun setBoardingReminders(enabled: Boolean) = launch { prefs.setBoardingReminders(enabled) }
+    fun setBoardingReminders(enabled: Boolean) = launch {
+        prefs.setBoardingReminders(enabled)
+        // Apply immediately rather than waiting up to 15 min for the next poll
+        // tick. Toggling off cancels any in-flight WorkManager reminders;
+        // toggling on schedules them for every currently-subscribed flight.
+        val subscribed = repo.getSubscribedFlights()
+        if (enabled) {
+            subscribed.forEach { boardingReminders.schedule(it) }
+        } else {
+            subscribed.forEach { boardingReminders.cancel(it.faFlightId) }
+        }
+    }
     fun setLiveOngoingNotification(enabled: Boolean) = launch {
         prefs.setLiveOngoingNotification(enabled)
         // Apply immediately rather than waiting for the next poll tick. Without

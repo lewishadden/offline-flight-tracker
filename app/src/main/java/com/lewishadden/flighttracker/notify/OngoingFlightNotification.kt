@@ -83,7 +83,7 @@ class OngoingFlightNotification @Inject constructor(
         ).joinToString(" · ")
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_flight)
             .setContentTitle("${flight.ident} · $origin → $dest")
             .setContentText(statusLine.ifEmpty { "In flight" })
             .setStyle(NotificationCompat.BigTextStyle().bigText(statusLine.ifEmpty { "In flight" }))

@@ -120,7 +120,7 @@ class FlightPollWorker @AssistedInject constructor(
         )
         val pct = ((total / cap) * 100).toInt()
         val notif = NotificationCompat.Builder(applicationContext, FlightTrackerApp.UPDATES_CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_flight)
             .setContentTitle("Flight updates paused")
             .setContentText("AeroAPI usage at $pct% of plan cap. Resume in Settings.")
             .setStyle(

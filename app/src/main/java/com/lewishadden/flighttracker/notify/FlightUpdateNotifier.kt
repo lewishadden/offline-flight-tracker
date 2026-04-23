@@ -45,7 +45,10 @@ class FlightUpdateNotifier @Inject constructor(
 
         filtered.forEach { change ->
             val notif = NotificationCompat.Builder(context, FlightTrackerApp.UPDATES_CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                // Silhouette drawable — Android requires the small icon to be
+                // single-colour with alpha. Using the launcher mipmap renders as
+                // a white square in the status bar.
+                .setSmallIcon(R.drawable.ic_flight)
                 .setContentTitle(change.title)
                 .setContentText(change.message)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(change.message))

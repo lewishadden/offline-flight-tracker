@@ -26,14 +26,16 @@ object FlightChangeDetector {
             changes += FlightChange(
                 key = "gateOrigin",
                 title = "${current.ident}: departure gate",
-                message = formatAssignOrChange("Gate", from, to),
+                // Symmetric with arrival side — message reads "Departure gate
+                // 24 assigned." instead of the bare "Gate 24 assigned."
+                message = formatAssignOrChange("Departure gate", from, to),
             )
         }
         change(previous.terminalOrigin, current.terminalOrigin)?.let { (from, to) ->
             changes += FlightChange(
                 key = "terminalOrigin",
                 title = "${current.ident}: departure terminal",
-                message = formatAssignOrChange("Terminal", from, to),
+                message = formatAssignOrChange("Departure terminal", from, to),
             )
         }
         change(previous.gateDestination, current.gateDestination)?.let { (from, to) ->
@@ -112,10 +114,17 @@ object FlightChangeDetector {
             )
         }
         if (!previous.diverted && current.diverted) {
+            // AeroAPI replaces the destination field with the divert-to airport
+            // when a flight is diverted, so flight.destination IS the new target.
+            val to = listOfNotNull(
+                current.destination.city,
+                current.destination.iata ?: current.destination.icao,
+            ).joinToString(" ").trim().ifBlank { null }
             changes += FlightChange(
                 key = "diverted",
                 title = "${current.ident}: DIVERTED",
-                message = "Flight has been diverted.",
+                message = if (to != null) "Flight diverted to $to."
+                          else "Flight has been diverted.",
             )
         }
 
@@ -129,7 +138,15 @@ object FlightChangeDetector {
             }
         }
 
-        return changes
+        // Dedupe: if a delay change is firing, suppress the corresponding time
+        // change for the same direction. They describe the same underlying
+        // event ("ETA shifted by 5m" vs "Estimated touchdown now 18:42") and
+        // shouldn't both wake the user.
+        val keys = changes.mapTo(HashSet()) { it.key }
+        return changes.filterNot { c ->
+            (c.key == "estimatedOut" || c.key == "estimatedOff") && "departureDelay" in keys ||
+                (c.key == "estimatedOn" || c.key == "estimatedIn") && "arrivalDelay" in keys
+        }
     }
 
     private fun change(a: String?, b: String?): Pair<String?, String?>? =
