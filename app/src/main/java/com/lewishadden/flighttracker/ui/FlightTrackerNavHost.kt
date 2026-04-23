@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.lewishadden.flighttracker.ui.airport.AirportScreen
 import com.lewishadden.flighttracker.ui.detail.FlightDetailScreen
 import com.lewishadden.flighttracker.ui.flightmap.FlightMapScreen
 import com.lewishadden.flighttracker.ui.main.MainTabsScaffold
@@ -17,9 +18,11 @@ object Routes {
     const val DETAIL = "detail/{faFlightId}"
     const val PREDOWNLOAD = "predownload/{faFlightId}"
     const val MAP = "map/{faFlightId}"
+    const val AIRPORT = "airport/{code}"
     fun detail(faFlightId: String) = "detail/$faFlightId"
     fun predownload(faFlightId: String) = "predownload/$faFlightId"
     fun map(faFlightId: String) = "map/$faFlightId"
+    fun airport(code: String) = "airport/$code"
 }
 
 @Composable
@@ -40,7 +43,18 @@ fun FlightTrackerNavHost() {
                 vm = hiltViewModel(),
                 onPreDownload = { id -> nav.navigate(Routes.predownload(id)) },
                 onOpenMap = { id -> nav.navigate(Routes.map(id)) },
+                onOpenAirport = { code -> nav.navigate(Routes.airport(code)) },
                 onBack = { nav.popBackStack() },
+            )
+        }
+        composable(
+            Routes.AIRPORT,
+            arguments = listOf(navArgument("code") { type = NavType.StringType }),
+        ) {
+            AirportScreen(
+                vm = hiltViewModel(),
+                onBack = { nav.popBackStack() },
+                onOpenFlight = { id -> nav.navigate(Routes.detail(id)) },
             )
         }
         composable(

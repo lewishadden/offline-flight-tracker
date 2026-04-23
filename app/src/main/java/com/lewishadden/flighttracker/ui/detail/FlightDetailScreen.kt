@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +29,7 @@ import com.lewishadden.flighttracker.ui.theme.Brand
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowRightAlt
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Luggage
 import androidx.compose.material.icons.filled.Map
@@ -74,6 +77,7 @@ fun FlightDetailScreen(
     vm: FlightDetailViewModel,
     onPreDownload: (String) -> Unit,
     onOpenMap: (String) -> Unit,
+    onOpenAirport: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -156,6 +160,7 @@ fun FlightDetailScreen(
                         photo = ui.photo,
                         onPreDownload = { onPreDownload(vm.faFlightId) },
                         onOpenMap = { onOpenMap(vm.faFlightId) },
+                        onOpenAirport = onOpenAirport,
                         onPrepareForTrip = {
                             vm.prepareForTrip(
                                 onReadyForOfflineDownload = { onPreDownload(vm.faFlightId) }
@@ -178,6 +183,7 @@ private fun FlightDetailContent(
     photo: AircraftPhoto?,
     onPreDownload: () -> Unit,
     onOpenMap: () -> Unit,
+    onOpenAirport: (String) -> Unit,
     onPrepareForTrip: () -> Unit,
 ) {
     Column(
@@ -191,7 +197,7 @@ private fun FlightDetailContent(
         if (refreshing) LinearProgressIndicator(Modifier.fillMaxWidth())
 
         if (photo != null) AircraftPhotoCard(photo, flight.registration, flight.aircraftType)
-        HeroCard(flight)
+        HeroCard(flight, onOpenAirport)
         DepartureCard(flight)
         ArrivalCard(flight)
         AircraftCard(flight, units)
@@ -229,7 +235,7 @@ private fun FlightDetailContent(
 }
 
 @Composable
-private fun HeroCard(flight: Flight) {
+private fun HeroCard(flight: Flight, onOpenAirport: (String) -> Unit) {
     BrandCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -257,12 +263,18 @@ private fun HeroCard(flight: Flight) {
             Spacer(Modifier.height(18.dp))
 
             Row(verticalAlignment = Alignment.Top) {
+                // Tap an airport code to dive into the airport screen — uses
+                // ICAO (e.g. EGLL) for the API since IATA can be ambiguous;
+                // falls back to IATA if no ICAO is cached.
+                val originLookup = flight.origin.icao ?: flight.origin.iata
+                val destLookup = flight.destination.icao ?: flight.destination.iata
                 RouteEnd(
                     code = flight.origin.iata ?: flight.origin.icao ?: "—",
                     city = flight.origin.city,
                     date = flight.actualOut ?: flight.estimatedOut ?: flight.scheduledOut,
                     time = flight.actualOut ?: flight.estimatedOut ?: flight.scheduledOut,
                     tz = flight.origin.timezone,
+                    onCodeClick = originLookup?.let { code -> { onOpenAirport(code) } },
                 )
                 Spacer(Modifier.weight(1f))
                 Icon(
@@ -279,6 +291,7 @@ private fun HeroCard(flight: Flight) {
                     time = flight.actualIn ?: flight.estimatedIn ?: flight.scheduledIn,
                     tz = flight.destination.timezone,
                     alignEnd = true,
+                    onCodeClick = destLookup?.let { code -> { onOpenAirport(code) } },
                 )
             }
 
@@ -315,13 +328,23 @@ private fun RouteEnd(
     time: java.time.Instant?,
     tz: String?,
     alignEnd: Boolean = false,
+    onCodeClick: (() -> Unit)? = null,
 ) {
     Column(horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
-        Text(
-            code,
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Black,
-        )
+        // Airport code — rendered as a chunky button when there's an airport
+        // to look up, plain text otherwise. The button styling (filled tint +
+        // outline + chevron) makes the affordance unmistakable without
+        // shrinking the displaySmall typography that anchors the hero card.
+        if (onCodeClick != null) {
+            AirportCodeButton(code = code, onClick = onCodeClick)
+        } else {
+            Text(
+                text = code,
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
         city?.let {
             Text(
                 it,
@@ -341,6 +364,45 @@ private fun RouteEnd(
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
         )
+    }
+}
+
+/**
+ * Premium tappable airport-code chip used in the route hero. Displays the
+ * code at the same display-size scale as before but wrapped in a tinted
+ * pill with an outline + chevron so it reads unambiguously as a button.
+ */
+@Composable
+private fun AirportCodeButton(
+    code: String,
+    onClick: () -> Unit,
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    androidx.compose.material3.Surface(
+        onClick = onClick,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+        color = primary.copy(alpha = 0.14f),
+        contentColor = primary,
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, primary.copy(alpha = 0.45f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = code,
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Black,
+                color = primary,
+            )
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "Open airport details",
+                tint = primary,
+                modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }
 

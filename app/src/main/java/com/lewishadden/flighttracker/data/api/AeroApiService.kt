@@ -1,9 +1,11 @@
 package com.lewishadden.flighttracker.data.api
 
 import com.lewishadden.flighttracker.data.api.dto.AccountUsageDto
+import com.lewishadden.flighttracker.data.api.dto.AirportFlightsResponse
 import com.lewishadden.flighttracker.data.api.dto.AirportInfoDto
 import com.lewishadden.flighttracker.data.api.dto.FlightPositionResponse
 import com.lewishadden.flighttracker.data.api.dto.FlightsResponse
+import com.lewishadden.flighttracker.data.api.dto.MetarResponse
 import com.lewishadden.flighttracker.data.api.dto.RouteResponse
 import com.lewishadden.flighttracker.data.api.dto.TrackResponse
 import retrofit2.http.GET
@@ -45,6 +47,23 @@ interface AeroApiService {
     suspend fun getAirport(
         @Path("id") id: String
     ): AirportInfoDto
+
+    @GET("airports/{id}/flights/scheduled_departures")
+    suspend fun getScheduledDepartures(
+        @Path("id") id: String,
+        @Query("max_pages") maxPages: Int = 1,
+    ): AirportFlightsResponse
+
+    @GET("airports/{id}/flights/scheduled_arrivals")
+    suspend fun getScheduledArrivals(
+        @Path("id") id: String,
+        @Query("max_pages") maxPages: Int = 1,
+    ): AirportFlightsResponse
+
+    @GET("airports/{id}/weather/metar")
+    suspend fun getMetar(
+        @Path("id") id: String
+    ): MetarResponse
 
     @GET("account/usage")
     suspend fun getAccountUsage(): AccountUsageDto
