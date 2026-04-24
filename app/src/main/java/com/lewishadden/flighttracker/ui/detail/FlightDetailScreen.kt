@@ -1,9 +1,12 @@
 package com.lewishadden.flighttracker.ui.detail
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -54,6 +57,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -87,10 +91,22 @@ fun FlightDetailScreen(
     val subscribed by vm.subscribed.collectAsStateWithLifecycle()
     val units by vm.units.collectAsStateWithLifecycle()
 
+    val context = LocalContext.current
+    // Only subscribe if the user actually granted POST_NOTIFICATIONS. Without
+    // the permission nm.notify() is a silent no-op on Android 13+, so a
+    // "subscribed" flight would never deliver updates.
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
-    ) { _ ->
-        vm.toggleSubscription()
+    ) { granted ->
+        if (granted) {
+            vm.toggleSubscription()
+        } else {
+            Toast.makeText(
+                context,
+                "Enable notifications in system settings to receive flight updates.",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
     }
 
     BrandBackground {
@@ -111,7 +127,12 @@ fun FlightDetailScreen(
                     },
                     actions = {
                         IconButton(onClick = {
-                            if (!subscribed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            val needsRequest = !subscribed &&
+                                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                ContextCompat.checkSelfPermission(
+                                    context, Manifest.permission.POST_NOTIFICATIONS,
+                                ) != PackageManager.PERMISSION_GRANTED
+                            if (needsRequest) {
                                 permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                             } else {
                                 vm.toggleSubscription()
